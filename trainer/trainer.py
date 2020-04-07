@@ -75,7 +75,7 @@ class Trainer(BaseTrainer):
 
         if self.do_validation:
             val_log = self._valid_epoch(epoch)
-            log.update(**{"val_" + k : v for k, v in val_log.items()})
+            log.update(**{"val_" + k: v for k, v in val_log.items()})
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
@@ -108,7 +108,8 @@ class Trainer(BaseTrainer):
                     "valid")
                 self.valid_metrics.update("loss", loss.item())
                 for met in self.metric_ftns:
-                    self.valid_metrics.update(met.__name__, met(output, target))
+                    self.valid_metrics.update(
+                        met.__name__, met(output, target))
                 self.writer.add_image(
                     "input", make_grid(data.cpu(), nrow=8, normalize=True))
 

@@ -55,26 +55,28 @@ class ImageNetDataset(torch.utils.data.Dataset):
         train_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/train")
         train_dir = os.path.join(train_dir, cls)
         train_names = os.listdir(train_dir)
-        train_paths = [os.path.join(train_dir, train_name) \
-            for train_name in train_names]
+        train_paths = [os.path.join(train_dir, train_name)
+                       for train_name in train_names]
         self.filepaths = train_paths
         # Get validation filenames
         if include_val:
             val_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/val")
             val_df = pd.read_csv(os.path.join(root, "LOC_val_solution.csv"))
+
             # Get images containing the desired class
-            filter_fn = lambda x: cls in x
+            def filter_fn(x):
+                return cls in x
             filter = val_df["PredictionString"].apply(filter_fn)
             val_names = val_df["ImageId"][filter]
             # Get validation filepaths
-            val_paths = [os.path.join(val_dir, val_name + ".JPEG") \
-                for val_name in val_names]
+            val_paths = [os.path.join(val_dir, val_name + ".JPEG")
+                         for val_name in val_names]
             self.filepaths.extend(val_paths)
         # Load images
         if transform is None:
             transform = pre_processing.DCGAN_transform()
-        self.images = [transform(default_loader(filepath)) \
-            for filepath in self.filepaths]
+        self.images = [transform(default_loader(filepath))
+                       for filepath in self.filepaths]
 
     def __len__(self):
         return len(self.filepaths)

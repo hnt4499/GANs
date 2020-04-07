@@ -38,7 +38,7 @@ class ConfigParser:
         save_dir = Path(self.config["trainer"]["save_dir"])
 
         exper_name = self.config["name"]
-        if run_id is None: # Use timestamp as default run-id
+        if run_id is None:  # Use timestamp as default run-id
             run_id = datetime.now().strftime(r"%m%d_%H%M%S")
         self._save_dir = save_dir / "models" / exper_name / run_id
         self._log_dir = save_dir / "log" / exper_name / run_id
@@ -87,7 +87,7 @@ class ConfigParser:
             config.update(read_json(args.config))
 
         # Parse custom cli options into dictionary
-        modification = {opt.target : getattr(
+        modification = {opt.target: getattr(
             args, _get_opt_name(opt.flags)) for opt in options}
         return cls(config, resume, modification)
 
@@ -148,6 +148,7 @@ class ConfigParser:
     def log_dir(self):
         return self._log_dir
 
+
 # Helper functions to update config dict with custom cli options
 def _update_config(config, modification):
     if modification is None:
@@ -158,16 +159,19 @@ def _update_config(config, modification):
             _set_by_path(config, k, v)
     return config
 
+
 def _get_opt_name(flags):
     for flg in flags:
         if flg.startswith("--"):
             return flg.replace("--", "")
     return flags[0].replace("--", "")
 
+
 def _set_by_path(tree, keys, value):
     """Set a value in a nested object in tree by sequence of keys."""
     keys = keys.split(";")
     _get_by_path(tree, keys[:-1])[keys[-1]] = value
+
 
 def _get_by_path(tree, keys):
     """Access a nested object in tree by sequence of keys."""

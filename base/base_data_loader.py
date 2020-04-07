@@ -37,8 +37,9 @@ class BaseDataLoader(DataLoader):
 
         if isinstance(split, int):
             assert split > 0
-            assert split < self.n_samples, "Validation set size is configured" \
-                                           " to be larger than entire dataset."
+            assert split < self.n_samples, "Validation set size is " \
+                                           "configured to be larger than " \
+                                           "entire dataset."
             len_valid = split
         else:
             len_valid = int(self.n_samples * split)

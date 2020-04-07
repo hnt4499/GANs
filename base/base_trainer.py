@@ -85,8 +85,8 @@ class BaseTrainer:
             best = False
             if self.mnt_mode != "off":
                 try:
-                    # Check whether model performance improved or not, according
-                    # to specified metric(mnt_metric)
+                    # Check whether model performance improved or not,
+                    # according to specified metric(mnt_metric)
                     mi = self.mnt_mode == "min" and \
                         log[self.mnt_metric] <= self.mnt_best
                     ma = self.mnt_mode == "max" and \
@@ -107,9 +107,9 @@ class BaseTrainer:
                     not_improved_count += 1
 
                 if not_improved_count > self.early_stop:
-                    self.logger.info("Validation performance didn\"t improve "
-                                     "for {} epochs. Training stops.".format(
-                        self.early_stop))
+                    self.logger.info(
+                        "Validation performance didn\"t improve for "
+                        "{} epochs. Training stops.".format(self.early_stop))
                     break
 
             if epoch % self.save_period == 0:
@@ -146,7 +146,8 @@ class BaseTrainer:
         """
         arch = type(self.model).__name__
         state = {
-            "arch": arch, "epoch": epoch, "state_dict": self.model.state_dict(),
+            "arch": arch, "epoch": epoch,
+            "state_dict": self.model.state_dict(),
             "monitor_best": self.mnt_best, "config": self.config,
             "optimizer": self.optimizer.state_dict(),
         }
@@ -185,7 +186,7 @@ class BaseTrainer:
         # Load optimizer state from checkpoint only when optimizer type is not
         # changed.
         if checkpoint["config"]["optimizer"]["type"] != \
-            self.config["optimizer"]["type"]:
+                self.config["optimizer"]["type"]:
 
             self.logger.warning(
                 "Warning: Optimizer type given in config file is different "
