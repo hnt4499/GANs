@@ -2,7 +2,7 @@ from torchvision import datasets, transforms
 
 from base import BaseDataLoader
 from . import datasets as custom_datasets
-from processing import pre_processing
+from . import pre_processing
 
 
 class ImageNetLoader(BaseDataLoader):
@@ -15,12 +15,13 @@ class ImageNetLoader(BaseDataLoader):
     cls : str
         A ImageNet class name, for example "n01531178", which corresponds to
         "goldfinch".
+    image_size : int
+        Input images will be center-cropped and resized to this `image_size`.
     include_val : bool
         Whether to include images from validation set.
-    transform
-        A function to be applied to the input images. If `None`, the function
-        `DCGAN_transform` will be used with all default arguments
-        (`image_size=64`, `mean=0.0`, `std=1.0`).
+    transform : str
+        A string, name of the function in `pre_processing.py` to be taken as
+        the custom image transformation function. (default: "DCGAN_transform")
     batch_size : int
         Mini-batch size for training.
     shuffle : bool
@@ -30,10 +31,10 @@ class ImageNetLoader(BaseDataLoader):
         data will be loaded in the main process. (default: `0`)
 
     """
-    def __init__(self, data_dir, cls, include_val=False, transform=None,
-                 batch_size=128, shuffle=True, num_workers=1):
-        if transform is None:
-            transform = pre_processing.DCGAN_transform()
+    def __init__(self, data_dir, cls, image_size=64, include_val=False,
+                 transform="DCGAN_transform", batch_size=128, shuffle=True,
+                 num_workers=1):
+        # Dataset
         self.data_dir = data_dir
         self.dataset = custom_datasets.ImageNetDataset(
             data_dir, cls, include_val=include_val, transform=transform)
