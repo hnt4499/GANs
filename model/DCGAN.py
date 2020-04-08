@@ -189,6 +189,13 @@ class DCGAN:
         A string, name of the function in `weights_init.py` to be taken as the
         custom weight initialization function. (default: "DCGAN_wi")
 
+    Attributes
+    ----------
+    netD
+        Discriminator
+    netG
+        Generator
+
     """
     def __init__(self, image_size=64, ndf=64, nz=100, ngf=64, nc=3,
                  conv_bias=False, negative_slope=0.2, weights_init="DCGAN_wi"):
