@@ -1,1 +1,1 @@
-from . import DCGAN
+from .DCGAN import DCGAN
