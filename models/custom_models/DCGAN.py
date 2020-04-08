@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from base import BaseModel
-from . import weights_init as wi
+from models import weights_init as wi
 
 
 class Discriminator(BaseModel):

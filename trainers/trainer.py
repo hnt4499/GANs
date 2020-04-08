@@ -5,14 +5,39 @@ from torchvision.utils import make_grid
 from base import BaseTrainer
 from utils import inf_loop, MetricTracker
 
-import model.loss as module_loss
-import model.metric as module_metric
+import models.loss as module_loss
+import models.metrics as module_metrics
 
 
 class BaseGANTrainer(BaseTrainer):
+    """Training logic for DCGAN.
+
+    Parameters
+    ----------
+    model
+        Instantiated model architecture. A subclass of `base.BaseModel`, found
+        in module `model.model`. For example `model.model.DCGAN`.
+    data_loader
+        Instantiated data loader. A subclass of `base.BaseDataLoader`, found in
+        module `data_loader.data_loaders`.
+        For example `data_loader.data_loaders.ImageNetLoader`.
+    config : type
+        Description of parameter `config`.
+
+    Attributes
+    ----------
+    fixed_noise : type
+        Description of attribute `fixed_noise`.
+    tracker : type
+        Description of attribute `tracker`.
+    writer : type
+        Description of attribute `writer`.
+    config
+    data_loader
+    model
+
     """
-    Trainer class
-    """
+
     def __init__(self, model, data_loader, config):
         super().__init__(model=model, criterion=None, metric_ftns=None,
                          optimizer=None, config=config)
@@ -41,7 +66,7 @@ class BaseGANTrainer(BaseTrainer):
         if config["compile"]["netD"]["metrics"] is None:
             self.metrics_D = list()
         else:
-            self.metrics_D = [getattr(module_metric, met) for met in
+            self.metrics_D = [getattr(module_metrics, met) for met in
                               config["compile"]["netD"]["metrics"]]
         # Initialize optimizer and learning rate scheduler for discriminator
         trainable_params_D = filter(

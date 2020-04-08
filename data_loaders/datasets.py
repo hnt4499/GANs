@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 from PIL import Image
 
-from . import pre_processing
+from data_loaders import pre_processing
 
 
 def pil_loader(path):

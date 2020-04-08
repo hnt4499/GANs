@@ -4,9 +4,9 @@ import collections
 import torch
 import numpy as np
 
-import data_loader.data_loaders as module_data
-import model.model as module_arch
-import trainer as module_trainer
+import data_loaders.data_loaders as module_data
+import models.models as module_arch
+import trainers as module_trainers
 
 from parse_config import ConfigParser
 
@@ -28,7 +28,7 @@ def main(config):
     logger.info(model)
 
     # Get trainer
-    trainer = getattr(module_trainer, config["trainer"]["name"])
+    trainer = getattr(module_trainers, config["trainer"]["name"])
     trainer = trainer(model=model, data_loader=data_loader, config=config)
 
     trainer.train()
