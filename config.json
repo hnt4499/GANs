@@ -1,49 +1,74 @@
 {
-    "name": "Mnist_LeNet",
+    "name": "DCGAN",
     "n_gpu": 1,
-
-    "arch": {
-        "type": "MnistModel",
-        "args": {}
-    },
+    "seed": 136,
     "data_loader": {
-        "type": "MnistDataLoader",
+        "type": "ImageNetLoader",
         "args":{
-            "data_dir": "data/",
-            "batch_size": 128,
-            "shuffle": true,
-            "validation_split": 0.1,
-            "num_workers": 2
+            "data_dir": "/media/jupyter/Data/dataset/ImageNet/ImageNet",
+            "cls": "n01514668",
+            "image_size": 64,
+            "include_val": true,
+            "transform": "DCGAN_transform",
+            "batch_size": 32,
+            "num_workers": 4
         }
     },
-    "optimizer": {
-        "type": "Adam",
-        "args":{
-            "lr": 0.001,
-            "weight_decay": 0,
-            "amsgrad": true
-        }
-    },
-    "loss": "nll_loss",
-    "metrics": [
-        "accuracy", "top_k_acc"
-    ],
-    "lr_scheduler": {
-        "type": "StepLR",
+    "arch": {
+        "type": "DCGAN",
         "args": {
-            "step_size": 50,
-            "gamma": 0.1
+            "image_size": 64,
+            "ndf": 64,
+            "ngf": 64,
+            "length_z": 100,
+            "conv_bias": false,
+            "negative_slope": 0.2,
+            "weights_init": "DCGAN_wi"
+        }
+    },
+    "compile": {
+        "netD": {
+            "optimizer": {
+                "type": "Adam",
+                "args":{
+                    "lr": 0.0001,
+                    "betas": [0.5, 0.999],
+                    "weight_decay": 0,
+                    "amsgrad": false
+                }
+            },
+            "loss": "bce_loss",
+            "metrics": null,
+            "lr_scheduler": null
+        },
+        "netG": {
+            "optimizer": {
+                "type": "Adam",
+                "args":{
+                    "lr": 0.0002,
+                    "betas": [0.5, 0.999],
+                    "weight_decay": 0,
+                    "amsgrad": false
+                }
+            },
+            "loss": "bce_loss",
+            "metrics": null,
+            "lr_scheduler": null,
+            "num_z": 64
         }
     },
     "trainer": {
-        "epochs": 100,
+        "name": "BaseGANTrainer",
 
-        "save_dir": "saved/",
-        "save_period": 1,
+        "epochs": 10000,
+
+        "save_dir": "/media/jupyter/Data/train/logs/",
+        "save_period": 10,
+        "log_step": 5,
         "verbosity": 2,
-        
-        "monitor": "min val_loss",
-        "early_stop": 10,
+
+        "monitor": "off",
+        "early_stop": null,
 
         "tensorboard": true
     }

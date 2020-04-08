@@ -171,7 +171,7 @@ class DCGAN:
         Number of channels of the first layer in the discriminator. The number
         of channels of a layer is as twice as that of its precedent layer
         (e.g, 64 -> 128 -> 256 -> 512 -> 1024).
-    nz : int
+    length_z : int
         Length of the noise input `z` of the generator. `z` is simply
         "transposed z-dimensional vector" of shape (1, 1, z).
     ngf : int
@@ -197,13 +197,28 @@ class DCGAN:
         Generator
 
     """
-    def __init__(self, image_size=64, ndf=64, nz=100, ngf=64, nc=3,
+    def __init__(self, image_size=64, ndf=64, length_z=100, ngf=64, nc=3,
                  conv_bias=False, negative_slope=0.2, weights_init="DCGAN_wi"):
+        # Cache parameters
+        self.ndf = ndf
+        self.ngf = ngf
+        self.length_z = length_z
+        self.nc = nc
         # Discriminator
         self.netD = Discriminator(
             image_size=image_size, ndf=ndf, nc=nc, conv_bias=conv_bias,
             negative_slope=negative_slope, weights_init=weights_init)
         # Generator
         self.netG = Generator(
-            image_size=image_size, nz=nz, ngf=ngf, nc=nc, conv_bias=conv_bias,
-            weights_init=weights_init)
+            image_size=image_size, nz=length_z, ngf=ngf, nc=nc,
+            conv_bias=conv_bias, weights_init=weights_init)
+
+    def __str__(self):
+        repr = "{}\n\n{}".format(
+            self.netD.__str__(), self.netG.__str__())
+        return repr
+
+    def to(self, device):
+        self.netD.to(device=device)
+        self.netG.to(device=device)
+        return self

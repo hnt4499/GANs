@@ -37,6 +37,7 @@ class ImageNetLoader(BaseDataLoader):
         # Dataset
         self.data_dir = data_dir
         self.dataset = custom_datasets.ImageNetDataset(
-            data_dir, cls, include_val=include_val, transform=transform)
+            data_dir, cls, image_size=image_size, include_val=include_val,
+            transform=transform)
         super().__init__(self.dataset, batch_size, shuffle,
                          validation_split=0.0, num_workers=num_workers)

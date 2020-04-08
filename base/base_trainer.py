@@ -29,6 +29,7 @@ class BaseTrainer:
         self.epochs = cfg_trainer["epochs"]
         self.save_period = cfg_trainer["save_period"]
         self.monitor = cfg_trainer.get("monitor", "off")
+        self.log_step = cfg_trainer.get("log_step", 5)
 
         # Configuration to monitor model performance and save best
         if self.monitor == "off":
@@ -113,7 +114,13 @@ class BaseTrainer:
                     break
 
             if epoch % self.save_period == 0:
-                self._save_checkpoint(epoch, save_best=best)
+                self._save_checkpoint(epoch, best)
+                self._save_results()
+
+    @abstractmethod
+    def _save_results(self):
+        """Function to be called every `self.save_period` epochs."""
+        raise NotImplementedError
 
     def _prepare_device(self, n_gpu_use):
         """
