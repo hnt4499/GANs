@@ -101,7 +101,8 @@
         "epochs": 1000,
 
         "save_dir": "/media/jupyter/Data/train/logs/DCGAN",
-        "save_period": 10,
+        "checkpoint_every": 25,
+        "images_every": 5,
         "log_step": 5,
         "verbosity": 2,
 

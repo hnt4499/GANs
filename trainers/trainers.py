@@ -63,6 +63,7 @@ class BaseGANTrainer(BaseTrainer):
                          optimizer=None, config=config)
         self.config = config
         self.data_loader = data_loader
+        self.images_every = config["trainer"]["images_every"]
         # Don't allow iteration-based training as in original implementation
         self.len_epoch = len(self.data_loader)
         # Don't allow validation
@@ -234,10 +235,21 @@ class BaseGANTrainer(BaseTrainer):
         total = self.data_loader.n_samples
         return self._get_progess(current, total)
 
-    def _save_results(self):
-        self.writer.add_image(
-            "fixed_noise",
-            make_grid(self.fake_data_fixed, nrow=8, normalize=True))
+    def _save_results(self, epoch):
+        """Function to be called every at the end of every epochs. Save images
+        generate with fixed noise inputs.
+
+        Parameters
+        ----------
+        epoch : int
+            Current epoch number.
+
+
+        """
+        if epoch % self.images_every == 0:
+            self.writer.add_image(
+                "fixed_noise",
+                make_grid(self.fake_data_fixed, nrow=8, normalize=True))
 
     def _save_checkpoint(self, epoch, save_best=False):
         """Saving checkpoints.
