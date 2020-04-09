@@ -5,9 +5,6 @@ from torchvision.utils import make_grid
 from base import BaseTrainer
 from utils import inf_loop, MetricTracker
 
-import models.loss as module_loss
-import models.metrics as module_metrics
-
 
 class BaseGANTrainer(BaseTrainer):
     """Training logic for DCGAN.
@@ -18,11 +15,31 @@ class BaseGANTrainer(BaseTrainer):
         Instantiated model architecture. A subclass of `base.BaseModel`, found
         in module `models.models`. For example `models.models.DCGAN`.
     data_loader
-        Instantiated data loader. A subclass of `base.BaseDataLoader`, found in
-        module `data_loaders.data_loaders`. For example
+        Instantiated data loader. A subclass of `base.BaseDataLoader`, defined
+        in module `data_loaders.data_loaders`. For example
         `data_loaders.data_loaders.ImageNetLoader`.
+    optimizer_D
+        Instantiated optimizer for the discriminator, defined in
+        `models.optim`, which takes only trainable parameters as arguments.
+    criterion_D
+        Instantiated loss function for the discriminator, defined in
+        `model.loss`, which take only model predictions and target labels, and
+        return the computed loss.
+    metrics_D
+        Instantiated metric function for the discriminator, defined in
+        `model.metrics`, which take only model predictions and target labels,
+        and return the computed metric.
+    optimizer_G
+        Instantiated optimizer for the generator, defined in `models.optim`,
+        which takes only trainable parameters as arguments.
+    criterion_G
+        Instantiated loss function for the generator, defined in `model.loss`,
+        which take only model predictions and target labels, and return the
+        computed loss.
     config
         The configurations parsed from a JSON file.
+    num_z : int
+        Number of fixed noise inputs.
 
     Attributes
     ----------
@@ -40,7 +57,8 @@ class BaseGANTrainer(BaseTrainer):
 
     """
 
-    def __init__(self, model, data_loader, config):
+    def __init__(self, model, data_loader, optimizer_D, criterion_D, metrics_D,
+                 optimizer_G, criterion_G, config, num_z=64):
         super().__init__(model=model, criterion=None, metric_ftns=None,
                          optimizer=None, config=config)
         self.config = config
@@ -55,41 +73,31 @@ class BaseGANTrainer(BaseTrainer):
         self.fake_label = 0
         # Fixed noise input for visual validation
         self.length_z = self.model.length_z
-        self.num_z = self.config["compile"]["netG"]["num_z"]
+        self.num_z = num_z
         self.fixed_noise = torch.randn(
             self.num_z, self.length_z, 1, 1, device=self.device)
 
         """
         DISCRIMINATOR
         """
-        # Loss and metrics
-        self.criterion_D = getattr(
-            module_loss, config["compile"]["netD"]["loss"])
-        if config["compile"]["netD"]["metrics"] is None:
+        # Loss, metrics and optimizer
+        self.criterion_D = criterion_D
+        if metrics_D is None:
             self.metrics_D = list()
         else:
-            self.metrics_D = [getattr(module_metrics, met) for met in
-                              config["compile"]["netD"]["metrics"]]
-        # Initialize optimizer and learning rate scheduler for discriminator
+            self.metrics_D = metrics_D
         trainable_params_D = filter(
             lambda p: p.requires_grad, model.netD.parameters())
-        self.optimizer_D = self._init_obj(
-            "netD", "optimizer", torch.optim, trainable_params_D)
-        self.lr_scheduler_D = self._init_obj(
-            "netD", "lr_scheduler", torch.optim.lr_scheduler, self.optimizer_D)
+        self.optimizer_D = optimizer_D(trainable_params_D)
 
         """
         GENERATOR
         """
-        self.criterion_G = getattr(
-            module_loss, config["compile"]["netG"]["loss"])
-        # Initialize optimizer and learning rate scheduler for discriminator
+        # Loss and optimizer
+        self.criterion_G = criterion_G
         trainable_params_G = filter(
             lambda p: p.requires_grad, model.netG.parameters())
-        self.optimizer_G = self._init_obj(
-            "netG", "optimizer", torch.optim, trainable_params_G)
-        self.lr_scheduler_G = self._init_obj(
-            "netG", "lr_scheduler", torch.optim.lr_scheduler, self.optimizer_G)
+        self.optimizer_G = optimizer_G(trainable_params_G)
 
         # Metrics tracker
         # For generator, don't allow any metrics other than loss
@@ -97,18 +105,6 @@ class BaseGANTrainer(BaseTrainer):
         self.tracker = MetricTracker(
             "loss_D", "loss_G", "D_x", "D_G_z1", "D_G_z2",
             *keys_D, writer=self.writer)
-
-    def _init_obj(self, m, name, module, *args, **kwargs):
-        """Helper function to initialize objects for Discriminator and
-        Generator."""
-        if self.config["compile"][m][name] is None:
-            return None
-        module_name = self.config["compile"][m][name]["type"]
-        module_args = dict(self.config["compile"][m][name]["args"])
-        assert all([k not in module_args for k in kwargs]), \
-            "Overwriting kwargs given in config file is not allowed."
-        module_args.update(kwargs)
-        return getattr(module, module_name)(*args, **module_args)
 
     def _train_epoch(self, epoch):
         """Training logic for an epoch.
@@ -220,12 +216,6 @@ class BaseGANTrainer(BaseTrainer):
                 self.fixed_noise).detach().cpu()
             self.fake_data_fixed = fake_data_fixed
 
-        # Update learning rate
-        if self.lr_scheduler_D is not None:
-            self.lr_scheduler_D.step()
-        if self.lr_scheduler_G is not None:
-            self.lr_scheduler_G.step()
-
         return self.tracker.result()
 
     def _get_progess(self, current, total):
@@ -260,14 +250,15 @@ class BaseGANTrainer(BaseTrainer):
             If True, rename the saved checkpoint to "model_best.pth".
 
         """
-        arch = type(self.model).__name__
+        model = type(self.model).__name__
         state = {
-            "arch": arch, "epoch": epoch,
+            "model": model, "epoch": epoch,
             "state_dict_D": self.model.netD.state_dict(),
             "state_dict_G": self.model.netG.state_dict(),
-            "monitor_best": self.mnt_best, "config": self.config,
             "optimizer_D": self.optimizer_D.state_dict(),
             "optimizer_G": self.optimizer_G.state_dict(),
+            "monitor_best": self.mnt_best,
+            "config": remove_all_obj(self.config.config),
         }
         filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(
             epoch))
@@ -282,13 +273,13 @@ class BaseGANTrainer(BaseTrainer):
         """Helper function for loading optimizer's state_dict"""
         # Load optimizer state from checkpoint only when optimizer type is not
         # changed.
-        if checkpoint["config"][optimizer_name]["type"] != \
-                self.config[optimizer_name]["type"]:
-
+        n1 = checkpoint["config"]["trainer"][optimizer_name]["name"]
+        n2 = self.config["trainer"][optimizer_name]["name"]
+        if n1 != n2:
             self.logger.warning(
-                "Warning: Optimizer type given in config file is different "
-                "from that of checkpoint. Optimizer parameters not being "
-                "resumed.")
+                "Warning: Optimizer type given in config file (`{}`) is "
+                "different from that of checkpoint (`{}`). Optimizer "
+                "parameters not being resumed.".format(n2, n1))
         else:
             optimizer = getattr(self, optimizer_name)
             optimizer.load_state_dict(checkpoint[optimizer_name])
@@ -309,11 +300,14 @@ class BaseGANTrainer(BaseTrainer):
         self.mnt_best = checkpoint["monitor_best"]
 
         # Load architecture params from checkpoint.
-        if checkpoint["config"]["arch"] != self.config["arch"]:
+        n1 = checkpoint["config"]["trainer"]["model"]["name"]
+        n2 = self.config["trainer"]["model"]["name"]
+        if n1 != n2:
             self.logger.warning(
-                "Warning: Architecture configuration given in config file is "
-                "different from that of checkpoint. This may yield an "
-                "exception while state_dict is being loaded.")
+                "Warning: Architecture configuration given in config file "
+                "(`{}`) is different from that of checkpoint (`{}`). This may "
+                "yield an exception while state_dict is being "
+                "loaded.".format(n2, n1))
         self.model.netD.load_state_dict(checkpoint["state_dict_D"])
         self.model.netG.load_state_dict(checkpoint["state_dict_G"])
 
@@ -323,3 +317,25 @@ class BaseGANTrainer(BaseTrainer):
 
         self.logger.info("Checkpoint loaded. Resume training from "
                          "epoch {}".format(self.start_epoch))
+
+
+def remove_all_obj(config):
+    """Recursively remove all instantiated objects from a configuration
+    dictionary and return a new one.
+
+    Parameters
+    ----------
+    config : collections.OrderedDict
+        Dict containing configurations, hyperparameters for training.
+        Contents of `config.json` file for example.
+    """
+    if not isinstance(config, dict):
+        return config
+
+    keys = config.keys()
+    new_config = dict()
+    for key in keys:
+        if key == "obj":
+            continue
+        new_config[key] = remove_all_obj(config[key])
+    return new_config

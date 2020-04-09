@@ -151,9 +151,9 @@ class BaseTrainer:
             If True, rename the saved checkpoint to "model_best.pth".
 
         """
-        arch = type(self.model).__name__
+        model = type(self.model).__name__
         state = {
-            "arch": arch, "epoch": epoch,
+            "model": model, "epoch": epoch,
             "state_dict": self.model.state_dict(),
             "monitor_best": self.mnt_best, "config": self.config,
             "optimizer": self.optimizer.state_dict(),
@@ -183,7 +183,8 @@ class BaseTrainer:
         self.mnt_best = checkpoint["monitor_best"]
 
         # Load architecture params from checkpoint.
-        if checkpoint["config"]["arch"] != self.config["arch"]:
+        if checkpoint["config"]["model"]["name"] != \
+                self.config["model"]["name"]:
             self.logger.warning(
                 "Warning: Architecture configuration given in config file is "
                 "different from that of checkpoint. This may yield an "

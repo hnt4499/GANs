@@ -4,8 +4,6 @@ import pandas as pd
 import torch
 from PIL import Image
 
-from data_loaders import pre_processing
-
 
 def pil_loader(path):
     # open path as file to avoid ResourceWarning
@@ -45,15 +43,14 @@ class ImageNetDataset(torch.utils.data.Dataset):
         "goldfinch".
     image_size : int
         Input images will be center-cropped and resized to this `image_size`.
+    transform : str
+        A function in `pre_processing.py` to be taken as the custom image
+        transformation function.
     include_val : bool
         Whether to include images from validation set.
-    transform : str
-        A string, name of the function in `pre_processing.py` to be taken as
-        the custom image transformation function. (default: "DCGAN_transform")
 
     """
-    def __init__(self, root, cls, image_size=64, include_val=False,
-                 transform="DCGAN_transform"):
+    def __init__(self, root, cls, image_size, transform, include_val=False):
         super(ImageNetDataset).__init__()
         # Get train filepaths
         train_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/train")
@@ -77,8 +74,7 @@ class ImageNetDataset(torch.utils.data.Dataset):
                          for val_name in val_names]
             self.filepaths.extend(val_paths)
         # Get transformation function
-        self.transform = getattr(pre_processing, transform)(
-            image_size=image_size)
+        self.transform = transform
         # Load images
         self.images = [self.transform(default_loader(filepath))
                        for filepath in self.filepaths]

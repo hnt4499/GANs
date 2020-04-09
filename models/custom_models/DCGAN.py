@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from base import BaseModel
-from models import weights_init as wi
 
 
 class Discriminator(BaseModel):
@@ -27,16 +26,15 @@ class Discriminator(BaseModel):
         Whether to include bias in the convolutional layers.
     negative_slope : float
         Hypterparameter for the Leaky RELU layers.
-    weights_init : str
-        A string, name of the function in `weights_init.py` to be taken as the
-        custom weight initialization function. (default: "DCGAN_wi")
+    weights_init
+        A function initialized in `weights_init.py` to be taken as the
+        custom weight initialization function. (default: None)
 
     """
     def __init__(self, image_size=64, ndf=64, nc=3, conv_bias=False,
-                 negative_slope=0.2, weights_init="DCGAN_wi"):
+                 negative_slope=0.2, weights_init=None):
         super(Discriminator, self).__init__()
-        # Get weights initializer
-        self.weights_init = getattr(wi, weights_init)
+        self.weights_init = weights_init
         # Number of intermediate layers
         n_layers = math.log(image_size, 2) - 2
         if n_layers.is_integer() and n_layers >= 4:
@@ -75,7 +73,8 @@ class Discriminator(BaseModel):
         # Forward sequence
         self.fw = nn.Sequential(*seq)
         # Initialize weights
-        self.apply(self.weights_init)
+        if self.weights_init is not None:
+            self.apply(self.weights_init)
 
     def forward(self, x):
         return self.fw(x)
@@ -103,16 +102,15 @@ class Generator(BaseModel):
     conv_bias : bool
         Whether to include bias in the fractionally-strided convolutional
         layers.
-    weights_init : str
-        A string, name of the function in `weights_init.py` to be taken as the
-        custom weight initialization function. (default: "DCGAN_wi")
+    weights_init
+        A function initialized in `weights_init.py` to be taken as the
+        custom weight initialization function. (default: None)
 
     """
     def __init__(self, image_size=64, nz=100, ngf=64, nc=3, conv_bias=False,
-                 weights_init="DCGAN_wi"):
+                 weights_init=None):
         super(Generator, self).__init__()
-        # Get weights initializer
-        self.weights_init = getattr(wi, weights_init)
+        self.weights_init = weights_init
         # Number of intermediate layers
         n_layers = math.log(image_size, 2) - 2
         if n_layers.is_integer() and n_layers >= 4:
@@ -152,7 +150,8 @@ class Generator(BaseModel):
         # Forward sequence
         self.fw = nn.Sequential(*seq)
         # Initialize weights
-        self.apply(self.weights_init)
+        if self.weights_init is not None:
+            self.apply(self.weights_init)
 
     def forward(self, x):
         return self.fw(x)
@@ -185,9 +184,9 @@ class DCGAN:
         Whether to include bias in the convolutional layers.
     negative_slope : float
         Hypterparameter for the Leaky RELU layers of the discriminator.
-    weights_init : str
-        A string, name of the function in `weights_init.py` to be taken as the
-        custom weight initialization function. (default: "DCGAN_wi")
+    weights_init
+        A function initialized in `weights_init.py` to be taken as the
+        custom weight initialization function. (default: None)
 
     Attributes
     ----------
@@ -198,7 +197,7 @@ class DCGAN:
 
     """
     def __init__(self, image_size=64, ndf=64, ngf=64, length_z=100, nc=3,
-                 conv_bias=False, negative_slope=0.2, weights_init="DCGAN_wi"):
+                 conv_bias=False, negative_slope=0.2, weights_init=None):
         # Cache parameters
         self.ndf = ndf
         self.ngf = ngf

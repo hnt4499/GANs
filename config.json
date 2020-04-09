@@ -2,34 +2,69 @@
     "name": "DCGAN",
     "n_gpu": 1,
     "seed": 136,
-    "data_loader": {
-        "type": "ImageNetLoader",
-        "args":{
-            "data_dir": "/media/jupyter/Data/dataset/ImageNet/ImageNet",
-            "cls": "n01514668",
-            "image_size": 64,
-            "include_val": true,
-            "transform": "DCGAN_transform",
-            "batch_size": 32,
-            "num_workers": 4
-        }
-    },
-    "arch": {
-        "type": "DCGAN",
+
+    "trainer": {
+        "ignored": true,
+        "type": "trainer",
+        "name": "BaseGANTrainer",
         "args": {
-            "image_size": 64,
-            "ndf": 64,
-            "ngf": 64,
-            "length_z": 100,
-            "conv_bias": false,
-            "negative_slope": 0.2,
-            "weights_init": "DCGAN_wi"
-        }
-    },
-    "compile": {
-        "netD": {
-            "optimizer": {
-                "type": "Adam",
+
+            "model": {
+                "type": "model",
+                "name": "DCGAN",
+                "args": {
+                    "image_size": 64,
+                    "ndf": 64,
+                    "ngf": 64,
+                    "length_z": 100,
+                    "nc": 3,
+                    "conv_bias": false,
+                    "negative_slope": 0.2,
+                    "weights_init": {
+                        "type": "weights_init",
+                        "name": "DCGAN_wi",
+                        "args": {
+                            "conv_mean": 0.0,
+                            "conv_std": 0.02,
+                            "bn_mean": 1.0,
+                            "bn_std": 0.02
+                        }
+                    }
+                }
+            },
+
+            "data_loader": {
+                "type": "data_loader",
+                "name": "ImageNetLoader",
+                "args":{
+                    "dataset": {
+                        "type": "dataset",
+                        "name": "ImageNetDataset",
+                        "args": {
+                            "root": "/media/jupyter/Data/dataset/ImageNet/ImageNet",
+                            "cls": "n01514668",
+                            "image_size": 64,
+                            "include_val": true,
+                            "transform": {
+                                "type": "pre_processing",
+                                "name": "DCGAN_transform",
+                                "args": {
+                                    "image_size": 64,
+                                    "mean": 0.0,
+                                    "std": 1.0
+                                }
+                            }
+                        }
+                    },
+                    "batch_size": 32,
+                    "num_workers": 4,
+                    "shuffle": true
+                }
+            },
+
+            "optimizer_D": {
+                "type": "optimizer",
+                "name": "Adam",
                 "args":{
                     "lr": 0.0001,
                     "betas": [0.5, 0.999],
@@ -37,13 +72,17 @@
                     "amsgrad": false
                 }
             },
-            "loss": "bce_loss",
-            "metrics": null,
-            "lr_scheduler": null
-        },
-        "netG": {
-            "optimizer": {
-                "type": "Adam",
+            "criterion_D": {
+                "type": "criterion",
+                "name": "bce_loss",
+                "args": {}
+            },
+            "metrics_D": null,
+
+
+            "optimizer_G": {
+                "type": "optimizer",
+                "name": "Adam",
                 "args":{
                     "lr": 0.0002,
                     "betas": [0.5, 0.999],
@@ -51,18 +90,17 @@
                     "amsgrad": false
                 }
             },
-            "loss": "bce_loss",
-            "metrics": null,
-            "lr_scheduler": null,
+            "criterion_G": {
+                "type": "criterion",
+                "name": "bce_loss",
+                "args": {}
+            },
             "num_z": 64
-        }
-    },
-    "trainer": {
-        "name": "BaseGANTrainer",
+        },
 
-        "epochs": 10000,
+        "epochs": 1000,
 
-        "save_dir": "/media/jupyter/Data/train/logs/",
+        "save_dir": "/media/jupyter/Data/train/logs/DCGAN",
         "save_period": 10,
         "log_step": 5,
         "verbosity": 2,

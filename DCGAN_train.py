@@ -4,33 +4,33 @@ import collections
 import torch
 import numpy as np
 
-import data_loaders.data_loaders as module_data
-import models.models as module_arch
-import trainers as module_trainers
-
-from parse_config import ConfigParser
+from parse_config import type_mapping, ConfigParser
 
 
-def main(config):
+def main(args, options):
+    # Parse config and initialize all objects
+    config = ConfigParser.from_args(args, options)
     # Fix random seeds for reproducibility
     torch.manual_seed(config["seed"])
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     np.random.seed(config["seed"])
-
+    # Get logger
     logger = config.get_logger("train")
-
-    # Setup data_loader instances
-    data_loader = config.init_obj("data_loader", module_data)
-
-    # Build model architecture, then print to console
-    model = config.init_obj("arch", module_arch)
-    logger.info(model)
-
-    # Get trainer
-    trainer = getattr(module_trainers, config["trainer"]["name"])
-    trainer = trainer(model=model, data_loader=data_loader, config=config)
-
+    #
+    trainer_kwargs = dict()
+    # Get outermost instantiated objects and remove all metadata
+    t = config["trainer"]["args"]
+    for key in t.keys():
+        if isinstance(t[key], dict) and "obj" in t[key]:
+            trainer_kwargs[key] = t[key]["obj"]
+        else:
+            trainer_kwargs[key] = t[key]
+    # Since `trainer` is ignored, it needs to be initialized
+    trainer = getattr(
+        type_mapping[config["trainer"]["type"]], config["trainer"]["name"])
+    trainer = trainer(config=config, **trainer_kwargs)
+    # Start training
     trainer.train()
 
 
@@ -54,5 +54,4 @@ if __name__ == "__main__":
         CustomArgs(flags=["--bs", "--batch_size"], type=int,
                    target="data_loader;args;batch_size")
     ]
-    config = ConfigParser.from_args(args, options)
-    main(config)
+    main(args, options)

@@ -7,6 +7,13 @@ from datetime import datetime
 
 from logger import setup_logging
 from utils import read_json, write_json
+from trainers import remove_all_obj
+
+# Modules
+import models as module_models
+import compile as module_compile
+import data_loaders as module_data
+import trainers as module_trainers
 
 
 class ConfigParser:
@@ -49,7 +56,7 @@ class ConfigParser:
         self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
 
         # Save updated config file to the checkpoint dir
-        write_json(self.config, self.save_dir / "config.json")
+        write_json(remove_all_obj(self.config), self.save_dir / "config.json")
 
         # Configure logging module
         setup_logging(self.log_dir)
@@ -82,6 +89,9 @@ class ConfigParser:
             cfg_fname = Path(args.config)
 
         config = read_json(cfg_fname)
+        # Initialize objects in-place
+        init_all_obj(config)
+
         if args.config and resume:
             # Update new config for fine-tuning
             config.update(read_json(args.config))
@@ -176,3 +186,79 @@ def _set_by_path(tree, keys, value):
 def _get_by_path(tree, keys):
     """Access a nested object in tree by sequence of keys."""
     return reduce(getitem, keys, tree)
+
+
+"""Helper functions to deal with object initializations"""
+
+type_mapping = {
+    # Models
+    "model": module_models.models,
+    "weights_init": module_models.weights_init,
+    # Data
+    "data_loader": module_data.data_loaders,
+    "dataset": module_data.datasets,
+    "pre_processing": module_data.pre_processing,
+    # Compile
+    "criterion": module_compile.criterion,
+    "metric": module_compile.metrics,
+    "optimizer": module_compile.optimizers,
+    # Trainer
+    "trainer": module_trainers
+}
+
+
+def _get_fn(kwargs):
+    """Helper function to get instantiated function from parsed keyword
+    arguments."""
+    ans = dict()
+    for key in kwargs.keys():
+        if isinstance(kwargs[key], dict) and "obj" in kwargs[key]:
+            ans[key] = kwargs[key]["obj"]
+        else:
+            ans[key] = kwargs[key]
+    return ans
+
+
+def init_all_obj(config, level=0, path="root", is_arg=False):
+    """Recursively initialize all objects within a configuration. Modify
+    the existing configuration in-place.
+
+    Parameters
+    ----------
+    config : collections.OrderedDict
+        Dict containing configurations, hyperparameters for training.
+        Contents of `config.json` file for example.
+
+    """
+    if not isinstance(config, dict):
+        return
+    keys = config.keys()
+    # If any of ["type", "name", "args"] is in config.keys() and the others
+    # are not, raise an Error
+    isin = [key in keys for key in ["type", "name", "args"]]
+    if (not is_arg) and level > 0 and any(isin):
+        if sum(isin) < 3:
+            raise ValueError(
+                'One or more of ["type", "name", "args"] are missing at '
+                + path)
+        # Initialize children objects
+        for key in keys:
+            init_all_obj(config[key], level + 1, path, is_arg=True)
+        # Ignore current object if `ignored` is set to True
+        if "ignored" in config and config["ignored"]:
+            return
+        # Otherwise, initialize current object
+        if config["type"] not in type_mapping:
+            raise ValueError(
+                "Invalid type at {}. Expected one of {}, got \"{}\" "
+                "instead".format(
+                    path, list(type_mapping.keys()), config["type"]))
+        kwargs = _get_fn(config["args"])
+        fn = getattr(type_mapping[config["type"]], config["name"])
+        # Set attribute `obj` to be the instantiated function
+        config["obj"] = fn(**kwargs)
+    # Allow function arguments to have one of ["type", "name", "args"]
+    else:
+        for key in keys:
+            child_path = path + "->" + key
+            init_all_obj(config[key], level + 1, child_path, is_arg=False)
