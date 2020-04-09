@@ -16,22 +16,24 @@ class BaseGANTrainer(BaseTrainer):
     ----------
     model
         Instantiated model architecture. A subclass of `base.BaseModel`, found
-        in module `model.model`. For example `model.model.DCGAN`.
+        in module `models.models`. For example `models.models.DCGAN`.
     data_loader
         Instantiated data loader. A subclass of `base.BaseDataLoader`, found in
-        module `data_loader.data_loaders`.
-        For example `data_loader.data_loaders.ImageNetLoader`.
-    config : type
-        Description of parameter `config`.
+        module `data_loaders.data_loaders`. For example
+        `data_loaders.data_loaders.ImageNetLoader`.
+    config
+        The configurations parsed from a JSON file.
 
     Attributes
     ----------
-    fixed_noise : type
-        Description of attribute `fixed_noise`.
-    tracker : type
-        Description of attribute `tracker`.
-    writer : type
-        Description of attribute `writer`.
+    fixed_noise
+        The fixed noise input tensor, which is fixed and fed into the generator
+        to visually see the progress.
+    tracker
+        An object of `utils.MetricTracker`. Used to track the metrics such as
+        loss.
+    writer
+        A Tensorboard writer.
     config
     data_loader
     model

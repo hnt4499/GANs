@@ -171,14 +171,14 @@ class DCGAN:
         Number of channels of the first layer in the discriminator. The number
         of channels of a layer is as twice as that of its precedent layer
         (e.g, 64 -> 128 -> 256 -> 512 -> 1024).
-    length_z : int
-        Length of the noise input `z` of the generator. `z` is simply
-        "transposed z-dimensional vector" of shape (1, 1, z).
     ngf : int
         Number of channels of the second-last layer in the generator (where the
         last layer is the output fake image). The number of channels of a layer
         is as twice as that of its successive layer
         (e.g, 1024 -> 512 -> 256 -> 128 -> 64).
+    length_z : int
+        Length of the noise input `z` of the generator. `z` is simply
+        "transposed z-dimensional vector" of shape (1, 1, z).
     nc : int
         Number of image channels.
     conv_bias : bool
@@ -197,7 +197,7 @@ class DCGAN:
         Generator
 
     """
-    def __init__(self, image_size=64, ndf=64, length_z=100, ngf=64, nc=3,
+    def __init__(self, image_size=64, ndf=64, ngf=64, length_z=100, nc=3,
                  conv_bias=False, negative_slope=0.2, weights_init="DCGAN_wi"):
         # Cache parameters
         self.ndf = ndf

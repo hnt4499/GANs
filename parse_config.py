@@ -23,7 +23,7 @@ class ConfigParser:
         resume : str
             Path to the checkpoint being loaded.
         modification : dict
-            Dictionary of  keychain:value, specifying position values to be
+            Dictionary of keychain:value, specifying position values to be
             replaced from config dict.
         run_id
             Unique Identifier for training processes. Used to save checkpoints
