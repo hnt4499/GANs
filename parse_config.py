@@ -159,7 +159,9 @@ class ConfigParser:
         return self._log_dir
 
 
-# Helper functions to update config dict with custom cli options
+"""Helper functions to update config dict with custom cli options"""
+
+
 def _update_config(config, modification):
     if modification is None:
         return config
@@ -207,9 +209,9 @@ type_mapping = {
 }
 
 
-def _get_fn(kwargs):
-    """Helper function to get instantiated function from parsed keyword
-    arguments."""
+def _get_kwargs(kwargs):
+    """Helper function to prune outermost instantiated objects' metadata and
+    return the clean keyword arguments."""
     ans = dict()
     for key in kwargs.keys():
         if isinstance(kwargs[key], dict) and "obj" in kwargs[key]:
@@ -253,7 +255,7 @@ def init_all_obj(config, level=0, path="root", is_arg=False):
                 "Invalid type at {}. Expected one of {}, got \"{}\" "
                 "instead".format(
                     path, list(type_mapping.keys()), config["type"]))
-        kwargs = _get_fn(config["args"])
+        kwargs = _get_kwargs(config["args"])
         fn = getattr(type_mapping[config["type"]], config["name"])
         # Set attribute `obj` to be the instantiated function
         config["obj"] = fn(**kwargs)
