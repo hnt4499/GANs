@@ -262,24 +262,25 @@ class BaseGANTrainer(BaseTrainer):
             If True, rename the saved checkpoint to "model_best.pth".
 
         """
-        model = type(self.model).__name__
-        state = {
-            "model": model, "epoch": epoch,
-            "state_dict_D": self.model.netD.state_dict(),
-            "state_dict_G": self.model.netG.state_dict(),
-            "optimizer_D": self.optimizer_D.state_dict(),
-            "optimizer_G": self.optimizer_G.state_dict(),
-            "monitor_best": self.mnt_best,
-            "config": remove_all_obj(self.config.config),
-        }
-        filename = str(self.checkpoint_dir / "checkpoint-epoch{}.pth".format(
-            epoch))
-        torch.save(state, filename)
-        self.logger.info("Saving checkpoint: {} ...".format(filename))
-        if save_best:
-            best_path = str(self.checkpoint_dir / "model_best.pth")
-            torch.save(state, best_path)
-            self.logger.info("Saving current best: model_best.pth ...")
+        if epoch % self.checkpoint_every == 0:
+            model = type(self.model).__name__
+            state = {
+                "model": model, "epoch": epoch,
+                "state_dict_D": self.model.netD.state_dict(),
+                "state_dict_G": self.model.netG.state_dict(),
+                "optimizer_D": self.optimizer_D.state_dict(),
+                "optimizer_G": self.optimizer_G.state_dict(),
+                "monitor_best": self.mnt_best,
+                "config": remove_all_obj(self.config.config),
+            }
+            filename = str(
+                self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
+            torch.save(state, filename)
+            self.logger.info("Saving checkpoint: {} ...".format(filename))
+            if save_best:
+                best_path = str(self.checkpoint_dir / "model_best.pth")
+                torch.save(state, best_path)
+                self.logger.info("Saving current best: model_best.pth ...")
 
     def _load_optimizer(self, checkpoint, optimizer_name):
         """Helper function for loading optimizer's state_dict"""
