@@ -41,14 +41,15 @@ class ConfigParser:
         exper_name = self.config["name"]
         if run_id is None:  # Use timestamp as default run-id
             run_id = datetime.now().strftime(r"%m%d_%H%M%S")
-        self._save_dir = save_dir / "models" / exper_name / run_id
-        self._log_dir = save_dir / "log" / exper_name / run_id
+        dir_name = "{}_{}".format(exper_name, run_id)
+        self._checkpoint_dir = save_dir / dir_name / "models"
+        self._log_dir = save_dir / dir_name / "logs"
         # Make directory for saving checkpoints and log.
         exist_ok = run_id == ""
-        self.save_dir.mkdir(parents=True, exist_ok=exist_ok)
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=exist_ok)
         self.log_dir.mkdir(parents=True, exist_ok=exist_ok)
         # Save updated config file to the checkpoint dir
-        write_json(self.prune(), self.save_dir / "config.json")
+        write_json(self.prune(), self.checkpoint_dir / "config.json")
         # Configure logging module
         setup_logging(self.log_dir)
         self.log_levels = {
@@ -201,8 +202,8 @@ class ConfigParser:
         return self._config
 
     @property
-    def save_dir(self):
-        return self._save_dir
+    def checkpoint_dir(self):
+        return self._checkpoint_dir
 
     @property
     def log_dir(self):

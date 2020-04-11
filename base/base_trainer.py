@@ -20,17 +20,16 @@ class BaseTrainer:
         self.model = model.to(self.device)
         if len(device_ids) > 1:
             self.model = torch.nn.DataParallel(model, device_ids=device_ids)
-
+        # Compiling model
         self.criterion = criterion
         self.metric_ftns = metric_ftns
         self.optimizer = optimizer
-
+        # Training options
         cfg_trainer = config["trainer"]
         self.epochs = cfg_trainer["epochs"]
         self.checkpoint_every = cfg_trainer["checkpoint_every"]
         self.monitor = cfg_trainer.get("monitor", "off")
         self.log_step = cfg_trainer.get("log_step", 5)
-
         # Configuration to monitor model performance and save best
         if self.monitor == "off":
             self.mnt_mode = "off"
@@ -43,13 +42,13 @@ class BaseTrainer:
             self.early_stop = cfg_trainer.get("early_stop", inf)
 
         self.start_epoch = 1
-
-        self.checkpoint_dir = config.save_dir
-
+        # Directory to save models and logs
+        self.checkpoint_dir = config.checkpoint_dir
+        self.log_dir = config.log_dir
         # Setup visualization writer instance
         self.writer = TensorboardWriter(
-            config.log_dir, self.logger, cfg_trainer["tensorboard"])
-
+            self.log_dir, self.logger, cfg_trainer["tensorboard"])
+        # Resume checkpoint if specified
         if config.resume is not None:
             self._resume_checkpoint(config.resume)
 
