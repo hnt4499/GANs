@@ -116,9 +116,13 @@ class ConfigParser:
             args, _get_opt_name(opt.flags)) for opt in options}
         return cls(config, args.resume, modification)
 
-    def __getitem__(self, name):
+    def __getitem__(self, key):
         """Access items like ordinary dict."""
-        return self.config[name]
+        return self.config[key]
+
+    def __contains__(self, key):
+        """Check if a key is in a dict"""
+        return key in self.config
 
     def get_logger(self, name, verbosity=2):
         """Get logger with a verbosity level."""

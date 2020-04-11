@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 from torchvision.utils import make_grid
@@ -63,12 +65,18 @@ class BaseGANTrainer(BaseTrainer):
                          optimizer=None, config=config)
         self.config = config
         self.data_loader = data_loader
-        self.images_every = config["trainer"]["images_every"]
+        self.images_every = self.config["trainer"]["images_every"]
         # Don't allow iteration-based training as in original implementation
         self.len_epoch = len(self.data_loader)
         # Don't allow validation
         self.valid_data_loader = None
         self.do_validation = False
+        # Maximum number of checkpoints to keep
+        if "checkpoint_keep" in self.config["trainer"]:
+            self.checkpoint_keep = self.config["trainer"]["checkpoint_keep"]
+        else:
+            self.checkpoint_keep = -1  # keep all
+        self.saved_checkpoints = list()  # list of saved checkpoints
         # Labels convention
         self.real_label = 1
         self.fake_label = 0
@@ -263,6 +271,7 @@ class BaseGANTrainer(BaseTrainer):
 
         """
         if epoch % self.checkpoint_every == 0:
+            # Get model metadata
             model = type(self.model).__name__
             state = {
                 "model": model, "epoch": epoch,
@@ -273,10 +282,19 @@ class BaseGANTrainer(BaseTrainer):
                 "monitor_best": self.mnt_best,
                 "config": self.config.prune(),
             }
+            # Save the current model
             filename = str(
                 self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
             torch.save(state, filename)
             self.logger.info("Saving checkpoint: {} ...".format(filename))
+            # Cache
+            self.saved_checkpoints.append(filename)
+            # Remove the oldest checkpoint, if needed
+            if self.checkpoint_keep > 0 and \
+                    len(self.saved_checkpoints) > self.checkpoint_keep:
+                to_remove = self.saved_checkpoints.pop(0)
+                os.remove(to_remove)
+            # Save the best model if requested
             if save_best:
                 best_path = str(self.checkpoint_dir / "model_best.pth")
                 torch.save(state, best_path)
