@@ -4,7 +4,7 @@ import collections
 import torch
 import numpy as np
 
-from parse_config import type_mapping, ConfigParser
+from parse_config import ConfigParser
 
 
 def main(args, options):
@@ -28,7 +28,8 @@ def main(args, options):
             trainer_kwargs[key] = t[key]
     # Since `trainer` is ignored, it needs to be initialized
     trainer = getattr(
-        type_mapping[config["trainer"]["type"]], config["trainer"]["name"])
+        config.get_module_from_type(config["trainer"]["type"]),
+        config["trainer"]["name"])
     trainer = trainer(config=config, **trainer_kwargs)
     # Start training
     trainer.train()

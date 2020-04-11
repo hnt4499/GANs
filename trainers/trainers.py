@@ -271,7 +271,7 @@ class BaseGANTrainer(BaseTrainer):
                 "optimizer_D": self.optimizer_D.state_dict(),
                 "optimizer_G": self.optimizer_G.state_dict(),
                 "monitor_best": self.mnt_best,
-                "config": remove_all_obj(self.config.config),
+                "config": self.config.prune(),
             }
             filename = str(
                 self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
@@ -330,25 +330,3 @@ class BaseGANTrainer(BaseTrainer):
 
         self.logger.info("Checkpoint loaded. Resume training from "
                          "epoch {}".format(self.start_epoch))
-
-
-def remove_all_obj(config):
-    """Recursively remove all instantiated objects from a configuration
-    dictionary and return a new one.
-
-    Parameters
-    ----------
-    config : collections.OrderedDict
-        Dict containing configurations, hyperparameters for training.
-        Contents of `config.json` file for example.
-    """
-    if not isinstance(config, dict):
-        return config
-
-    keys = config.keys()
-    new_config = dict()
-    for key in keys:
-        if key == "obj":
-            continue
-        new_config[key] = remove_all_obj(config[key])
-    return new_config
