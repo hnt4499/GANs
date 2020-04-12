@@ -216,7 +216,7 @@ class BaseGANTrainer(BaseTrainer):
             # For generator, don't allow any metrics other than loss
             self.tracker.update("loss_G", loss_G.item())
 
-            # Print info and save images
+            # Print info
             if batch_idx % self.log_step == 0:
                 self.logger.debug(
                     "{}{}\tLoss_D: {:.6f}\tLoss_G: {:.6f}\tD(x): {:.4f}\t"
@@ -230,7 +230,6 @@ class BaseGANTrainer(BaseTrainer):
             fake_data_fixed = self.model.netG(
                 self.fixed_noise).detach().cpu()
             self.fake_data_fixed = fake_data_fixed
-
         # Early stopping
         if self.callbacks is not None:
             if self.callbacks(self):
@@ -249,9 +248,9 @@ class BaseGANTrainer(BaseTrainer):
             log.update(result)
             # Print logged informations to the screen
             for key, value in log.items():
-                self.logger.info("    {:15s}: {}".format(str(key), value))
+                self.logger.info("\t{:15s}: {}".format(str(key), value))
             # Save results
-            self._save_checkpoint(epoch, save_best=False)
+            self._save_checkpoint(epoch)
             self._save_results(epoch)
             # Early stopping
             if self.stop:
@@ -274,14 +273,13 @@ class BaseGANTrainer(BaseTrainer):
         return self._get_progess(current, total)
 
     def _save_results(self, epoch):
-        """Function to be called every at the end of every epochs. Save images
-        generate with fixed noise inputs.
+        """Function to be called at the end of every epoch. Save images
+        generated with fixed noise inputs to a TensorboardWriter.
 
         Parameters
         ----------
         epoch : int
             Current epoch number.
-
 
         """
         if epoch % self.images_every == 0:
@@ -289,8 +287,8 @@ class BaseGANTrainer(BaseTrainer):
                 "fixed_noise",
                 make_grid(self.fake_data_fixed, nrow=8, normalize=True))
 
-    def _save_checkpoint(self, epoch, save_best=False):
-        """Saving checkpoints.
+    def _save_checkpoint(self, epoch):
+        """Save current model state to a checkpoint.
 
         Parameters
         ----------
@@ -324,11 +322,6 @@ class BaseGANTrainer(BaseTrainer):
                     len(self.saved_checkpoints) > self.checkpoint_keep:
                 to_remove = self.saved_checkpoints.pop(0)
                 os.remove(to_remove)
-            # Save the best model if requested
-            if save_best:
-                best_path = str(self.checkpoint_dir / "model_best.pth")
-                torch.save(state, best_path)
-                self.logger.info("Saving current best: model_best.pth ...")
 
     def _load_optimizer(self, checkpoint, optimizer_name):
         """Helper function for loading optimizer's state_dict"""
