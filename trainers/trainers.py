@@ -42,6 +42,9 @@ class BaseGANTrainer(BaseTrainer):
         The configurations parsed from a JSON file.
     num_z : int
         Number of fixed noise inputs.
+    callbacks : trainers.callbacks
+        An early stopping callbacks, which gets called every epoch and return a
+        boolean value indicating whether to stop the training process.
 
     Attributes
     ----------
@@ -60,7 +63,7 @@ class BaseGANTrainer(BaseTrainer):
     """
 
     def __init__(self, model, data_loader, optimizer_D, criterion_D, metrics_D,
-                 optimizer_G, criterion_G, config, num_z=64):
+                 optimizer_G, criterion_G, config, num_z=64, callbacks=None):
         super().__init__(model=model, criterion=None, metric_ftns=None,
                          optimizer=None, config=config)
         self.config = config
@@ -85,6 +88,9 @@ class BaseGANTrainer(BaseTrainer):
         self.num_z = num_z
         self.fixed_noise = torch.randn(
             self.num_z, self.length_z, 1, 1, device=self.device)
+        # Callbacks
+        self.callbacks = callbacks
+        self.stop = False
 
         """
         DISCRIMINATOR
@@ -225,7 +231,31 @@ class BaseGANTrainer(BaseTrainer):
                 self.fixed_noise).detach().cpu()
             self.fake_data_fixed = fake_data_fixed
 
+        # Early stopping
+        if self.callbacks is not None:
+            if self.callbacks(self):
+                self.stop = True
+
         return self.tracker.result()
+
+    def train(self):
+        """
+        Full training logic
+        """
+        for epoch in range(self.start_epoch, self.epochs + 1):
+            result = self._train_epoch(epoch)
+            # Save logged informations into log dict
+            log = {"epoch": epoch}
+            log.update(result)
+            # Print logged informations to the screen
+            for key, value in log.items():
+                self.logger.info("    {:15s}: {}".format(str(key), value))
+            # Save results
+            self._save_checkpoint(epoch, save_best=False)
+            self._save_results(epoch)
+            # Early stopping
+            if self.stop:
+                break
 
     def _get_progess(self, current, total):
         n = len(str(total))

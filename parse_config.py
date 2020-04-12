@@ -165,7 +165,8 @@ class ConfigParser:
             "metric": module_compile.metrics,
             "optimizer": module_compile.optimizers,
             # Trainer
-            "trainer": module_trainers
+            "trainer": module_trainers.trainers,
+            "callbacks": module_trainers.callbacks
         }
         # Save mapping for future use
         self.type_mapping = type_mapping

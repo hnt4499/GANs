@@ -53,3 +53,8 @@ class MetricTracker:
 
     def result(self):
         return dict(self._data.average)
+
+    def __getitem__(self, key):
+        """Convenience interface to get the current average value of a
+        quantity. Identical behavior to `avg`."""
+        return self.avg(key)
