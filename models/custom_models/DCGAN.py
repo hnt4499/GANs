@@ -3,10 +3,10 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 
-from base import BaseModel
+from base import BaseGANComponent
 
 
-class Discriminator(BaseModel):
+class DCGANDiscriminator(BaseGANComponent):
     """DCGAN Discriminator. Note that all layers are channel-first.
     Adapted from:
         https://github.com/pytorch/examples/blob/master/dcgan/main.py#L164
@@ -16,44 +16,66 @@ class Discriminator(BaseModel):
     image_size : int
         Discriminator's output image size. Must be of the form `2 ** n`, n >= 6
         (e.g., 64 or 128).
-    ndf : int
+    num_features : int
         Number of channels of the first layer. The number of channels of
         a layer is as twice as that of its precedent layer
         (e.g, 64 -> 128 -> 256 -> 512 -> 1024).
-    nc : int
-        Number of input image channels.
+    num_channels : int
+        One of [1, 3]. Number of input image channels.
     conv_bias : bool
         Whether to include bias in the convolutional layers.
     negative_slope : float
         Hypterparameter for the Leaky RELU layers.
-    weights_init
-        A function initialized in `weights_init.py` to be taken as the
-        custom weight initialization function. (default: None)
+    optimizer : fn
+        A function initialized in `compile.optimizers` that takes only the
+        model trainable parameters as input.
+    criterion : fn
+        A function initialized in `compile.criterion` that takes the model
+        predictions and target labels, and return the computed loss.
+    metric : fn
+        A function initialized in `compile.metrics` that takes the model
+        predictions and target labels, and return the computed metric.
+    weights_init : fn
+        A function initialized in `models.weights_init` that will then be
+        passed to `model.apply()`. (default: None)
 
     """
-    def __init__(self, image_size=64, ndf=64, nc=3, conv_bias=False,
-                 negative_slope=0.2, weights_init=None):
-        super(Discriminator, self).__init__()
-        self.weights_init = weights_init
+    def __init__(self, image_size, num_features, num_channels, conv_bias,
+                 negative_slope, optimizer, criterion, metric,
+                 weights_init=None):
+
+        super(DCGANDiscriminator, self).__init__(
+            optimizer, criterion, metric, weights_init)
+
+        # Cache data
+        self.image_size = image_size
+        self.num_features = num_features
+        self.num_channels = num_channels
+        self.conv_bias = conv_bias
+        self.negative_slope = negative_slope
         # Number of intermediate layers
-        n_layers = math.log(image_size, 2) - 2
-        if n_layers.is_integer() and n_layers >= 4:
-            self.n_layers = int(n_layers)
+        num_layers = math.log(image_size, 2) - 2
+        if num_layers.is_integer() and num_layers >= 4:
+            self.num_layers = int(num_layers)
         else:
             raise ValueError(
                 "Invalid value for `image_size`: {}".format(image_size))
+        # Number of channels
+        if num_channels not in [1, 3]:
+            raise ValueError("Invalid value for `num_channels`. Expected one "
+                             "of [1, 3], got {} instead.".format(num_features))
 
         seq = list()
         # First layer
         seq.extend([
             nn.Conv2d(
-                in_channels=nc, out_channels=ndf, kernel_size=4, stride=2,
-                padding=1, bias=conv_bias),
+                in_channels=num_channels, out_channels=num_features,
+                kernel_size=4, stride=2, padding=1, bias=conv_bias),
             nn.LeakyReLU(negative_slope, inplace=True)
         ])
         # The rest of the intermediate layers
-        out_channels = ndf
-        for i in range(self.n_layers - 1):
+        out_channels = num_features
+        for i in range(self.num_layers - 1):
             in_channels = out_channels
             out_channels = in_channels * 2
             seq.extend([
@@ -70,17 +92,17 @@ class Discriminator(BaseModel):
                 stride=1, padding=0, bias=False),
             nn.Sigmoid()
         ])
+
         # Forward sequence
         self.fw = nn.Sequential(*seq)
-        # Initialize weights
-        if self.weights_init is not None:
-            self.apply(self.weights_init)
+        # Initialize optimizer and model weights
+        self.init()
 
     def forward(self, x):
         return self.fw(x)
 
 
-class Generator(BaseModel):
+class DCGANGenerator(BaseGANComponent):
     """DCGAN Generator. Note that all layers are channel-first.
     Adapted from:
         https://github.com/pytorch/examples/blob/master/dcgan/main.py#L122
@@ -90,49 +112,70 @@ class Generator(BaseModel):
     image_size : int
         Generator's output image size. Must be of the form `2 ** n`, n >= 6
         (e.g., 64 or 128).
-    nz : int
+    input_length : int
         Length of the noise input `z`. `z` is simply "transposed z-dimensional
         vector" of shape (1, 1, z).
-    ngf : int
+    num_features : int
         Number of channels of the second-last layer (where the last layer is
         the output fake image). The number of channels of a layer is as twice
         as that of its successive layer (e.g, 1024 -> 512 -> 256 -> 128 -> 64).
-    nc : int
+    num_channels : int
         Number of output image channels.
     conv_bias : bool
         Whether to include bias in the fractionally-strided convolutional
         layers.
-    weights_init
-        A function initialized in `weights_init.py` to be taken as the
-        custom weight initialization function. (default: None)
+    optimizer : fn
+        A function initialized in `compile.optimizers` that takes only the
+        model trainable parameters as input.
+    criterion : fn
+        A function initialized in `compile.criterion` that takes the model
+        predictions and target labels, and return the computed loss.
+    metric : fn
+        A function initialized in `compile.metrics` that takes the model
+        predictions and target labels, and return the computed metric.
+    weights_init : fn
+        A function initialized in `models.weights_init` that will then be
+        passed to `model.apply()`. (default: None)
 
     """
-    def __init__(self, image_size=64, nz=100, ngf=64, nc=3, conv_bias=False,
-                 weights_init=None):
-        super(Generator, self).__init__()
-        self.weights_init = weights_init
+    def __init__(self, image_size, input_length, num_features, num_channels,
+                 conv_bias, optimizer, criterion, metric, weights_init=None):
+
+        super(DCGANGenerator, self).__init__(
+            optimizer, criterion, metric, weights_init)
+
+        # Cache data
+        self.image_size = image_size
+        self.input_length = input_length
+        self.num_features = num_features
+        self.num_channels = num_channels
+        self.conv_bias = conv_bias
         # Number of intermediate layers
-        n_layers = math.log(image_size, 2) - 2
-        if n_layers.is_integer() and n_layers >= 4:
-            self.n_layers = int(n_layers)
+        num_layers = math.log(image_size, 2) - 2
+        if num_layers.is_integer() and num_layers >= 4:
+            self.num_layers = int(num_layers)
         else:
             raise ValueError(
                 "Invalid value for `image_size`: {}".format(image_size))
+        # Number of channels
+        if num_channels not in [1, 3]:
+            raise ValueError("Invalid value for `num_channels`. Expected one "
+                             "of [1, 3], got {} instead.".format(num_features))
 
         seq = list()
         # First layer
-        out_channels = ngf * (2 ** (self.n_layers - 1))
+        out_channels = num_features * (2 ** (self.num_layers - 1))
         seq.extend([
             nn.ConvTranspose2d(
-                in_channels=nz, out_channels=out_channels, kernel_size=4,
-                stride=1, padding=0, bias=conv_bias),
+                in_channels=input_length, out_channels=out_channels,
+                kernel_size=4, stride=1, padding=0, bias=conv_bias),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         ])
         # The rest of the intermediate layers
-        for i in range(self.n_layers - 1):
+        for i in range(self.num_layers - 1):
             in_channels = out_channels
-            out_channels = ngf * (2 ** (self.n_layers - 2 - i))
+            out_channels = num_features * (2 ** (self.num_layers - 2 - i))
             seq.extend([
                 nn.ConvTranspose2d(
                     in_channels=in_channels, out_channels=out_channels,
@@ -143,81 +186,15 @@ class Generator(BaseModel):
         # The output layer
         seq.extend([
             nn.ConvTranspose2d(
-                in_channels=out_channels, out_channels=nc, kernel_size=4,
-                stride=2, padding=1, bias=False),
+                in_channels=out_channels, out_channels=num_channels,
+                kernel_size=4, stride=2, padding=1, bias=False),
             nn.Tanh()
         ])
+
         # Forward sequence
         self.fw = nn.Sequential(*seq)
-        # Initialize weights
-        if self.weights_init is not None:
-            self.apply(self.weights_init)
+        # Initialize optimizer and model weights
+        self.init()
 
     def forward(self, x):
         return self.fw(x)
-
-
-class DCGAN:
-    """DCGAN Model. Note that all layers in discriminator and generator are
-    channel-first.
-
-    Parameters
-    ----------
-    image_size : int
-        Discriminator's input and generator's output image size. Must be of the
-        form `2 ** n`, n >= 6 (e.g., 64 or 128).
-    ndf : int
-        Number of channels of the first layer in the discriminator. The number
-        of channels of a layer is as twice as that of its precedent layer
-        (e.g, 64 -> 128 -> 256 -> 512 -> 1024).
-    ngf : int
-        Number of channels of the second-last layer in the generator (where the
-        last layer is the output fake image). The number of channels of a layer
-        is as twice as that of its successive layer
-        (e.g, 1024 -> 512 -> 256 -> 128 -> 64).
-    length_z : int
-        Length of the noise input `z` of the generator. `z` is simply
-        "transposed z-dimensional vector" of shape (1, 1, z).
-    nc : int
-        Number of image channels.
-    conv_bias : bool
-        Whether to include bias in the convolutional layers.
-    negative_slope : float
-        Hypterparameter for the Leaky RELU layers of the discriminator.
-    weights_init
-        A function initialized in `weights_init.py` to be taken as the
-        custom weight initialization function. (default: None)
-
-    Attributes
-    ----------
-    netD
-        Discriminator
-    netG
-        Generator
-
-    """
-    def __init__(self, image_size=64, ndf=64, ngf=64, length_z=100, nc=3,
-                 conv_bias=False, negative_slope=0.2, weights_init=None):
-        # Cache parameters
-        self.ndf = ndf
-        self.ngf = ngf
-        self.length_z = length_z
-        self.nc = nc
-        # Discriminator
-        self.netD = Discriminator(
-            image_size=image_size, ndf=ndf, nc=nc, conv_bias=conv_bias,
-            negative_slope=negative_slope, weights_init=weights_init)
-        # Generator
-        self.netG = Generator(
-            image_size=image_size, nz=length_z, ngf=ngf, nc=nc,
-            conv_bias=conv_bias, weights_init=weights_init)
-
-    def __str__(self):
-        repr = "{}\n\n{}".format(
-            self.netD.__str__(), self.netG.__str__())
-        return repr
-
-    def to(self, device):
-        self.netD.to(device=device)
-        self.netG.to(device=device)
-        return self

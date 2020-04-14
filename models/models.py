@@ -1,1 +1,1 @@
-from .custom_models.DCGAN import DCGAN
+from .custom_models.DCGAN import *

@@ -8,127 +8,46 @@ from logger import TensorboardWriter
 
 class BaseTrainer:
     """
-    Base class for all trainers
+    Base class for all trainers, taking care of basic parameters and
+    configurations.
     """
-    def __init__(self, model, criterion, metric_ftns, optimizer, config):
-        self.config = config
-        self.logger = config.get_logger(
-            "trainer", config["trainer"]["verbosity"])
+    def __init__(self, netD, netG, config):
 
-        # Setup GPU device if available, move model into configured device
-        self.device, device_ids = self._prepare_device(config["n_gpu"])
-        self.model = model.to(self.device)
-        if len(device_ids) > 1:
-            self.model = torch.nn.DataParallel(model, device_ids=device_ids)
-        # Compiling model
-        self.criterion = criterion
-        self.metric_ftns = metric_ftns
-        self.optimizer = optimizer
-        # Training options
+        # Cache data
+        self.netD = netD
+        self.netG = netG
+        self.config = config
+        self.stop = False  # use for early stopping
+        # Setup GPU device if available and move model into configured device
+        self.device, self.device_ids = self._get_device(config["n_gpu"])
+        self.netD = self.netD.to(self.device)
+        self.netG = self.netG.to(self.device)
+        if len(self.device_ids) > 1:
+            self.netD = torch.nn.DataParallel(
+                self.netD, device_ids=self.device_ids)
+            self.netG = torch.nn.DataParallel(
+                self.netG, device_ids=self.device_ids)
+        # Training configuration
         cfg_trainer = config["trainer"]
         self.epochs = cfg_trainer["epochs"]
-        self.checkpoint_every = cfg_trainer["checkpoint_every"]
-        self.monitor = cfg_trainer.get("monitor", "off")
-        self.log_step = cfg_trainer.get("log_step", 5)
-        # Configuration to monitor model performance and save best
-        if self.monitor == "off":
-            self.mnt_mode = "off"
-            self.mnt_best = 0
-        else:
-            self.mnt_mode, self.mnt_metric = self.monitor.split()
-            assert self.mnt_mode in ["min", "max"]
-
-            self.mnt_best = inf if self.mnt_mode == "min" else -inf
-            self.early_stop = cfg_trainer.get("early_stop", inf)
-
-        self.start_epoch = 1
+        self.save_ckpt_every = cfg_trainer["save_ckpt_every"]
+        self.write_logs_every = cfg_trainer["write_logs_every"]
         # Directory to save models and logs
         self.checkpoint_dir = config.checkpoint_dir
         self.log_dir = config.log_dir
+        # Get logger
+        self.logger = config.get_logger(
+            "trainer", verbosity=config["trainer"]["verbosity"])
         # Setup visualization writer instance
         self.writer = TensorboardWriter(
-            self.log_dir, self.logger, cfg_trainer["tensorboard"])
+            self.log_dir, self.logger, enabled=cfg_trainer["tensorboard"])
         # Resume checkpoint if specified
-        if config.resume is not None:
+        if "resume" in config and config.resume is not None:
             self._resume_checkpoint(config.resume)
+        else:
+            self.start_epoch = 1
 
-    @abstractmethod
-    def _train_epoch(self, epoch):
-        """Training logic for an epoch.
-
-        Parameters
-        ----------
-        epoch : int
-            Current epoch number.
-
-        """
-        raise NotImplementedError
-
-    def train(self):
-        """
-        Full training logic
-        """
-        not_improved_count = 0
-        for epoch in range(self.start_epoch, self.epochs + 1):
-            result = self._train_epoch(epoch)
-
-            # Save logged informations into log dict
-            log = {"epoch": epoch}
-            log.update(result)
-
-            # Print logged informations to the screen
-            for key, value in log.items():
-                self.logger.info("    {:15s}: {}".format(str(key), value))
-
-            # Evaluate model performance according to configured metric, save
-            # best checkpoint as model_best
-            best = False
-            if self.mnt_mode != "off":
-                try:
-                    # Check whether model performance improved or not,
-                    # according to specified metric(mnt_metric)
-                    mi = self.mnt_mode == "min" and \
-                        log[self.mnt_metric] <= self.mnt_best
-                    ma = self.mnt_mode == "max" and \
-                        log[self.mnt_metric] >= self.mnt_best
-                    improved = mi or ma
-                except KeyError:
-                    self.logger.warning("Warning: Metric \"{}\" is not found. "
-                                        "Model performance monitoring is "
-                                        "disabled.".format(self.mnt_metric))
-                    self.mnt_mode = "off"
-                    improved = False
-
-                if improved:
-                    self.mnt_best = log[self.mnt_metric]
-                    not_improved_count = 0
-                    best = True
-                else:
-                    not_improved_count += 1
-
-                if not_improved_count > self.early_stop:
-                    self.logger.info(
-                        "Validation performance didn\"t improve for "
-                        "{} epochs. Training stops.".format(self.early_stop))
-                    break
-
-            self._save_checkpoint(epoch, best)
-            self._save_results(epoch)
-
-    @abstractmethod
-    def _save_results(self, epoch):
-        """Function to be called every at the end of every epochs.
-
-        Parameters
-        ----------
-        epoch : int
-            Current epoch number, which can be used to keep track of when to
-            save the results.
-
-        """
-        raise NotImplementedError
-
-    def _prepare_device(self, n_gpu_use):
+    def _get_device(self, n_gpu_use):
         """
         Setup GPU device if available, move model into configured device
         """
@@ -146,33 +65,30 @@ class BaseTrainer:
         list_ids = list(range(n_gpu_use))
         return device, list_ids
 
-    def _save_checkpoint(self, epoch, save_best=False):
-        """Saving checkpoints.
-
-        Parameters
-        ----------
-        epoch : int
-            Current epoch number.
-        save_best : bool
-            If True, rename the saved checkpoint to "model_best.pth".
-
+    def _save_checkpoint(self):
         """
-        if epoch % self.checkpoint_every == 0:
-            model = type(self.model).__name__
+        Save current model state to a checkpoint.
+        """
+        if self.epoch % self.save_ckpt_every == 0:
             state = {
-                "model": model, "epoch": epoch,
-                "state_dict": self.model.state_dict(),
-                "monitor_best": self.mnt_best, "config": self.config,
-                "optimizer": self.optimizer.state_dict(),
+                "epoch": self.epoch,
+                "config": self.config.prune(),
+
+                "netD_name": type(self.netD).__name__,
+                "netG_name": type(self.netG).__name__,
+                "netD_state_dict": self.netD.state_dict(),
+                "netG_state_dict": self.netG.state_dict(),
+
+                "optimD_name": type(self.netD.optimizer).__name__,
+                "optimG_name": type(self.netG.optimizer).__name__,
+                "optimD_state_dict": self.netD.optimizer.state_dict(),
+                "optimG_state_dict": self.netG.optimizer.state_dict(),
             }
             filename = str(
-                self.checkpoint_dir / "checkpoint-epoch{}.pth".format(epoch))
+                self.checkpoint_dir / "checkpoint-epoch{}.pth".format(
+                    self.epoch))
             torch.save(state, filename)
             self.logger.info("Saving checkpoint: {} ...".format(filename))
-            if save_best:
-                best_path = str(self.checkpoint_dir / "model_best.pth")
-                torch.save(state, best_path)
-                self.logger.info("Saving current best: model_best.pth ...")
 
     def _resume_checkpoint(self, resume_path):
         """Resume from saved checkpoints.
@@ -187,28 +103,84 @@ class BaseTrainer:
         self.logger.info("Loading checkpoint: {} ...".format(resume_path))
         checkpoint = torch.load(resume_path)
         self.start_epoch = checkpoint["epoch"] + 1
-        self.mnt_best = checkpoint["monitor_best"]
-
         # Load architecture params from checkpoint.
-        if checkpoint["config"]["model"]["name"] != \
-                self.config["model"]["name"]:
+        curr_netD = type(self.netD).__name__
+        curr_netG = type(self.netG).__name__
+        if (checkpoint["netD_name"] != curr_netD) or \
+                (checkpoint["netG_name"] != curr_netG):
             self.logger.warning(
                 "Warning: Architecture configuration given in config file is "
                 "different from that of checkpoint. This may yield an "
                 "exception while state_dict is being loaded.")
-        self.model.load_state_dict(checkpoint["state_dict"])
-
+        self.netD.load_state_dict(checkpoint["state_dict_D"])
+        self.netG.load_state_dict(checkpoint["state_dict_G"])
         # Load optimizer state from checkpoint only when optimizer type is not
         # changed.
-        if checkpoint["config"]["optimizer"]["type"] != \
-                self.config["optimizer"]["type"]:
-
+        curr_optimD = type(self.netD.optimizer).__name__
+        curr_optimG = type(self.netG.optimizer).__name__
+        if (checkpoint["optimD_name"] != curr_optimD) or \
+                (checkpoint["optimG_name"] != curr_optimG):
             self.logger.warning(
                 "Warning: Optimizer type given in config file is different "
                 "from that of checkpoint. Optimizer parameters not being "
                 "resumed.")
         else:
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
+            self.netD.optimizer.load_state_dict(
+                checkpoint["optimD_state_dict"])
+            self.netG.optimizer.load_state_dict(
+                checkpoint["optimG_state_dict"])
 
         self.logger.info("Checkpoint loaded. Resume training from "
                          "epoch {}".format(self.start_epoch))
+
+    @abstractmethod
+    def _train_epoch(self):
+        """Training logic for an epoch.
+
+        Parameters
+        ----------
+        epoch : int
+            Current epoch number.
+
+        Returns
+        -------
+            A `dict` containing computed loss and metrics.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def on_epoch_start(self):
+        """
+        Function to be called at the beginning of every epochs. Note that this
+        function takes no arguments.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def on_epoch_end(self):
+        """
+        Function to be called at the end of every epochs. Note that this
+        function takes no arguments.
+        """
+        raise NotImplementedError
+
+    def train(self):
+        """
+        Full training logic
+        """
+        for epoch in range(self.start_epoch, self.epochs + 1):
+            self.epoch = epoch
+            # Epoch start
+            self.on_epoch_start()
+            # Start training
+            result = self._train_epoch()
+            # Save logged informations into log dict
+            log = {"epoch": epoch}
+            log.update(result)
+            # Print logged informations to the screen
+            for key, value in log.items():
+                self.logger.info("    {:15s}: {}".format(str(key), value))
+            # Epoch end
+            self.on_epoch_end()
+            if self.stop:
+                break

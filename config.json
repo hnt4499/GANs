@@ -8,27 +8,57 @@
         "type": "trainer",
         "name": "BaseGANTrainer",
         "args": {
-
-            "model": {
+            "netD": {
                 "type": "model",
-                "name": "DCGAN",
+                "name": "DCGANDiscriminator",
                 "args": {
                     "image_size": 64,
-                    "ndf": 64,
-                    "ngf": 64,
-                    "length_z": 100,
-                    "nc": 3,
+                    "num_features": 64,
+                    "num_channels": 3,
                     "conv_bias": false,
                     "negative_slope": 0.2,
+                    "optimizer": {
+                        "type": "optimizer",
+                        "name": "Adam",
+                        "args": {"lr": 0.0001, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": false}
+                    },
+                    "criterion": {
+                        "type": "criterion",
+                        "name": "bce_loss",
+                        "args": {}
+                    },
+                    "metric": null,
                     "weights_init": {
                         "type": "weights_init",
                         "name": "DCGAN_wi",
-                        "args": {
-                            "conv_mean": 0.0,
-                            "conv_std": 0.02,
-                            "bn_mean": 1.0,
-                            "bn_std": 0.02
-                        }
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 0.5, "bn_std": 0.02}
+                    }
+                }
+            },
+            "netG": {
+                "type": "model",
+                "name": "DCGANGenerator",
+                "args": {
+                    "image_size": 64,
+                    "input_length": 100,
+                    "num_features": 128,
+                    "num_channels": 3,
+                    "conv_bias": false,
+                    "optimizer": {
+                        "type": "optimizer",
+                        "name": "Adam",
+                        "args": {"lr": 0.0001, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": true}
+                    },
+                    "criterion": {
+                        "type": "criterion",
+                        "name": "bce_loss",
+                        "args": {}
+                    },
+                    "metric": null,
+                    "weights_init": {
+                        "type": "weights_init",
+                        "name": "DCGAN_wi",
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 0.5, "bn_std": 0.02}
                     }
                 }
             },
@@ -48,11 +78,7 @@
                             "transform": {
                                 "type": "pre_processing",
                                 "name": "DCGAN_transform",
-                                "args": {
-                                    "image_size": 64,
-                                    "mean": 0.0,
-                                    "std": 1.0
-                                }
+                                "args": {"image_size": 64, "mean": 0.0, "std": 1.0}
                             }
                         }
                     },
@@ -62,48 +88,20 @@
                 }
             },
 
-            "optimizer_D": {
-                "type": "optimizer",
-                "name": "Adam",
-                "args":{
-                    "lr": 0.0001,
-                    "betas": [0.5, 0.999],
-                    "weight_decay": 0,
-                    "amsgrad": false
-                }
-            },
-            "criterion_D": {
-                "type": "criterion",
-                "name": "bce_loss",
-                "args": {}
-            },
-            "metrics_D": null,
-
-
-            "optimizer_G": {
-                "type": "optimizer",
-                "name": "Adam",
-                "args":{
-                    "lr": 0.0002,
-                    "betas": [0.5, 0.999],
-                    "weight_decay": 0,
-                    "amsgrad": false
-                }
-            },
-            "criterion_G": {
-                "type": "criterion",
-                "name": "bce_loss",
-                "args": {}
-            },
-            "num_z": 64
+            "callbacks": {
+                "type": "callbacks",
+                "name": "Thresholding",
+                "args": {"monitor": "D_G_z2", "mode": "max", "threshold": 0.001, "min_delta": 0, "patience": 15, "verbose": 1}
+            }
         },
 
         "epochs": 1000,
 
-        "save_dir": "/media/jupyter/Data/train/logs/DCGAN",
-        "checkpoint_every": 25,
-        "images_every": 5,
-        "log_step": 5,
+        "save_dir": "/media/jupyter/Data/train/DCGAN",
+        "save_ckpt_every": 25,
+        "num_ckpt_to_keep": 5,
+        "save_images_every": 5,
+        "write_logs_every": 5,
         "verbosity": 2,
 
         "monitor": "off",
