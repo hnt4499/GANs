@@ -5,7 +5,7 @@ import torch
 from torchvision.utils import make_grid
 
 from base import BaseTrainer
-from utils import inf_loop, MetricTracker
+from utils import inf_loop, Cache, CustomMetrics, MetricTracker
 
 
 class BaseGANTrainer(BaseTrainer):
@@ -84,15 +84,14 @@ class BaseGANTrainer(BaseTrainer):
         # Callbacks
         self.callbacks = callbacks
         self.stop = False
-        # Metrics tracker. For generator, don't allow any metrics other than
-        # loss
-        if netD.metric is not None:
-            self.keys_D = [m.__name__ + "_D" for m in netD.metric]
-        else:
-            self.keys_D = list()
+        # Metrics tracker. Metrics can be a single function or a list of
+        # functions. Allow only discriminator to have metrics.
+        self.custom_metrics = CustomMetrics(self, netD.metric)
         self.tracker = MetricTracker(
             "loss_D", "loss_G", "D_x", "D_G_z1", "D_G_z2",
-            *self.keys_D, writer=self.writer)
+            *self.custom_metrics.metric_names, writer=self.writer)
+        # For storing current training information
+        self.current_batch = Cache()
 
     def _train_epoch(self):
         """Training logic for an epoch.
@@ -115,7 +114,7 @@ class BaseGANTrainer(BaseTrainer):
             """
             DISCRIMINATOR
             Update discriminator network with all-real batch. Maximize
-                log(D(x)) + log(1 - D(G(z)))
+            log(D(x))
             """
             self.netD.zero_grad()
             # Format batch
@@ -133,17 +132,18 @@ class BaseGANTrainer(BaseTrainer):
             D_x = output_D.mean().item()
 
             """
-            GENERATOR
-            Train generator with all-fake batch
+            DISCRIMINATOR
+            Update discriminator network with all-fake batch. Maximize
+            log(1 - D(G(z)))
             """
             # Input noise
             noise = torch.randn(
                 batch_size, self.length_z, 1, 1, device=self.device)
             # Generate fake image batch with generator
-            fake_data = self.netG(noise)
+            generated_from_random_noise = self.netG(noise)
             labels_D.fill_(self.fake_label)
             # Classify all-fake batch with discriminator
-            output_D = self.netD(fake_data.detach()).view(-1)
+            output_D = self.netD(generated_from_random_noise.detach()).view(-1)
             # Calculate discriminator's loss on the all-fake batch
             loss_D_fake = self.netD.criterion(output_D, labels_D)
             # Calculate the gradients for this batch
@@ -165,7 +165,7 @@ class BaseGANTrainer(BaseTrainer):
                 (batch_size,), self.real_label, device=self.device)
             # Since we just updated discriminator, perform another forward pass
             # of all-fake batch through discriminator
-            output_D = self.netD(fake_data).view(-1)
+            output_D = self.netD(generated_from_random_noise).view(-1)
             # Calculate generator's loss based on this output
             loss_G = self.netG.criterion(output_D, labels_G)
             # Calculate gradients for generator
@@ -175,6 +175,21 @@ class BaseGANTrainer(BaseTrainer):
             # Update generator
             self.netG.optimizer.step()
 
+            # Cache data for future use
+            with torch.no_grad():
+                generated_from_fixed_noise = self.netG(
+                    self.fixed_noise).detach()
+            self.current_batch.cache(
+                batch_idx=batch_idx,
+                batch_size=batch_size,
+                real_samples=real_data,
+                fixed_noise=self.fixed_noise,
+                generated_from_fixed_noise=generated_from_fixed_noise,
+                random_noise=noise,
+                generated_from_random_noise=generated_from_random_noise,
+                output_D=output_D,  # discriminator output for generated images
+            )
+
             # Update logger
             self.writer.set_step((self.epoch - 1) * self.len_epoch + batch_idx)
             # For discriminator
@@ -182,9 +197,10 @@ class BaseGANTrainer(BaseTrainer):
             self.tracker.update("D_x", D_x)
             self.tracker.update("D_G_z1", D_G_z1)
             self.tracker.update("D_G_z2", D_G_z2)
-            for met in self.keys_D:
-                self.tracker.update(
-                    met.__name__ + "_D", met(output_D, labels_D))
+            # Compute custom metrics and update to tracker
+            custom_metrics = self.custom_metrics.compute()
+            for met_name, met in custom_metrics.items():
+                self.tracker.update(met_name, met)
             # For generator, don't allow any metrics other than loss
             self.tracker.update("loss_G", loss_G.item())
             # Print info
@@ -209,11 +225,10 @@ class BaseGANTrainer(BaseTrainer):
         self._save_checkpoint()
         # Cache fake images on fixed noise input
         if self.epoch % self.save_images_every == 0:
-            with torch.no_grad():
-                fake_data = self.netG(self.fixed_noise).detach().cpu()
             self.writer.add_image(
                 "fixed_noise",
-                make_grid(fake_data, nrow=8, normalize=True))
+                make_grid(self.current_batch.generated_from_fixed_noise.cpu(),
+                          nrow=8, normalize=True))
         # Early stopping
         if self.callbacks is not None:
             self.stop = self.callbacks(self)

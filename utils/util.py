@@ -29,6 +29,50 @@ def inf_loop(data_loader):
         yield from loader
 
 
+class Cache:
+    """Helper class for data caching."""
+    def __init__(self):
+        return
+
+    def cache(self, **kwargs):
+        for key, value in kwargs.items():
+            self.__setattr__(key, value)
+        return
+
+
+class CustomMetrics:
+    """Helper class for dealing with custom metrics.
+
+    Parameters
+    ----------
+    trainer
+        The trainer object.
+    metrics
+        A single function that takes the state of the trainer and return the
+        computed metric, or a list of such functions.
+
+    """
+    def __init__(self, trainer, metrics):
+        self.trainer = trainer
+        if isinstance(metrics, list):
+            self.metrics = metrics
+        elif metrics is None:
+            self.metrics = list()
+        else:
+            self.metrics = [metrics]
+        # Get metric names
+        self.metric_names = [met.__name__ for met in self.metrics]
+
+    def compute(self):
+        computed_metrics = {}
+        for i in range(len(self.metrics)):
+            metric = self.metrics[i]
+            metric_name = self.metric_names[i]
+            computed_metrics[metric_name] = metric(self.trainer)
+        self.computed_metrics = computed_metrics
+        return computed_metrics
+
+
 class MetricTracker:
     def __init__(self, *keys, writer=None):
         self.writer = writer

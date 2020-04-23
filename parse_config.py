@@ -215,6 +215,21 @@ class ConfigParser:
         return self._log_dir
 
 
+def _prune_helper(config):
+    """Recursion helper function for `ConfigParser.prune`"""
+    if not isinstance(config, dict):
+        return config
+
+    keys = config.keys()
+    new_config = dict()
+    for key in keys:
+        # If "obj", ignore it
+        if key == "obj":
+            continue
+        new_config[key] = _prune_helper(config[key])
+    return new_config
+
+
 """Helper functions to update config dict with custom CLI options"""
 
 
@@ -260,6 +275,41 @@ def _get_kwargs(kwargs):
     return clean_kwargs
 
 
+def _get_initialized_objects(config, path, type_mapping):
+    """Helper function to initialize object from "type", "name" and "args".
+    Support initializing multiple objects (useful for `metrics`)"""
+    type_ = config["type"]
+    name = config["name"]
+    args = config["args"]
+    objs = list()
+
+    # If single entry, convert to list for convenience
+    if isinstance(type_, str):
+        type_ = [type_]
+        name = [name]
+        args = [args]
+    # If multiple entries, check if they are of the same type and length
+    else:
+        assert type(type_) == type(name) == type(args) == list
+        assert len(type_) == len(name) == len(args)
+    # Loop over all entries
+    for i in range(len(type_)):
+        # Check validity
+        if type_[i] not in type_mapping:
+            raise ValueError(
+                "Invalid type at {}. Expected one of {}, got \"{}\" "
+                "instead".format(path, list(type_mapping.keys()), type_[i]))
+        # Initialize
+        kwargs = _get_kwargs(args[i])
+        fn = getattr(type_mapping[type_[i]], name[i])
+        objs.append(fn(**kwargs))
+    if len(objs) == 1:
+        return objs[0]
+    else:
+        return objs
+
+
+
 def _init_all_helper(config, type_mapping, level=0, path="root",
                      is_arg=False):
     """Recursion helper function for `ConfigParser.init_all`.
@@ -292,37 +342,15 @@ def _init_all_helper(config, type_mapping, level=0, path="root",
         for key in keys:
             _init_all_helper(
                 config[key], type_mapping, level + 1, path, is_arg=True)
+
         # Ignore current object if `ignored` is set to True
         if "ignored" in config and config["ignored"]:
             return
         # Otherwise, initialize current object
-        if config["type"] not in type_mapping:
-            raise ValueError(
-                "Invalid type at {}. Expected one of {}, got \"{}\" "
-                "instead".format(
-                    path, list(type_mapping.keys()), config["type"]))
-        kwargs = _get_kwargs(config["args"])
-        fn = getattr(type_mapping[config["type"]], config["name"])
-        # Set attribute `obj` to be the instantiated function
-        config["obj"] = fn(**kwargs)
+        config["obj"] = _get_initialized_objects(config, path, type_mapping)
     # Allow function arguments to have one of ["type", "name", "args"]
     else:
         for key in keys:
             child_path = path + "->" + key
             _init_all_helper(
                 config[key], type_mapping, level + 1, child_path, is_arg=False)
-
-
-def _prune_helper(config):
-    """Recursion helper function for `ConfigParser.prune`"""
-    if not isinstance(config, dict):
-        return config
-
-    keys = config.keys()
-    new_config = dict()
-    for key in keys:
-        # If "obj", ignore it
-        if key == "obj":
-            continue
-        new_config[key] = _prune_helper(config[key])
-    return new_config
