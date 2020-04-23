@@ -32,20 +32,16 @@ class DCGANDiscriminator(BaseGANComponent):
     criterion : fn
         A function initialized in `compile.criterion` that takes the model
         predictions and target labels, and return the computed loss.
-    metric : fn
-        A function initialized in `compile.metrics` that takes the model
-        predictions and target labels, and return the computed metric.
     weights_init : fn
         A function initialized in `models.weights_init` that will then be
         passed to `model.apply()`. (default: None)
 
     """
     def __init__(self, image_size, num_features, num_channels, conv_bias,
-                 negative_slope, optimizer, criterion, metric,
-                 weights_init=None):
+                 negative_slope, optimizer, criterion, weights_init=None):
 
         super(DCGANDiscriminator, self).__init__(
-            optimizer, criterion, metric, weights_init)
+            optimizer, criterion, weights_init)
 
         # Cache data
         self.image_size = image_size
@@ -130,19 +126,16 @@ class DCGANGenerator(BaseGANComponent):
     criterion : fn
         A function initialized in `compile.criterion` that takes the model
         predictions and target labels, and return the computed loss.
-    metric : fn
-        A function initialized in `compile.metrics` that takes the model
-        predictions and target labels, and return the computed metric.
     weights_init : fn
         A function initialized in `models.weights_init` that will then be
         passed to `model.apply()`. (default: None)
 
     """
     def __init__(self, image_size, input_length, num_features, num_channels,
-                 conv_bias, optimizer, criterion, metric, weights_init=None):
+                 conv_bias, optimizer, criterion, weights_init=None):
 
         super(DCGANGenerator, self).__init__(
-            optimizer, criterion, metric, weights_init)
+            optimizer, criterion, weights_init)
 
         # Cache data
         self.image_size = image_size

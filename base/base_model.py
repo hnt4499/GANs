@@ -52,12 +52,11 @@ class BaseGANComponent(BaseModel):
     weights_init
 
     """
-    def __init__(self, optimizer, criterion, metric, weights_init=None):
+    def __init__(self, optimizer, criterion, weights_init=None):
         super(BaseGANComponent, self).__init__()
         # Cache data
         self.optimizer = optimizer
         self.criterion = criterion
-        self.metric = metric
         self.weights_init = weights_init
 
     def init(self):

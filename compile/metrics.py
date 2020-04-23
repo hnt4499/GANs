@@ -5,13 +5,39 @@ and return the computed metric.
 
 import torch
 
+from base.base_metric import BaseMetric
 
-def accuracy():
-    def acc_D(trainer):
-        """Calculate accuracy given model predictions and target labels of
-        generated samples."""
+
+class Accuracy(BaseMetric):
+    """Calculate accuracy of the discriminator classifying generated images.
+
+    Parameters
+    ----------
+    name : str
+        Name of the metric, for example `acc_d`.
+    dp : int
+        Number of decimal places to be printed. (default: 4)
+
+    Attributes
+    ----------
+    value
+        The latest computed metric value.
+    name
+    dp
+
+    """
+    def __init__(self, name, dp=4):
+        super(Accuracy, self).__init__(name)
+        self.dp = dp
+        self.repr = "{" + ":.{}f".format(dp) + "}"
+
+    def __str__(self):
+        # Format `self.value` to `dp` decimal places
+        num = self.repr.format(self.value)
+        return "{}: {}".format(self.name, num)
+
+    def __call__(self, trainer):
         with torch.no_grad():
-            # Get predictions
             pred = trainer.current_batch.output_D
             pred = (pred >= 0.5).type(torch.float32)
             # Get target labels
@@ -20,5 +46,5 @@ def accuracy():
                 trainer.fake_label, device=trainer.device)
             assert pred.shape[0] == len(target)
             correct = torch.sum(pred == target).item()
-        return correct / len(target)
-    return acc_D
+        self.value = correct / len(target)
+        return self.value

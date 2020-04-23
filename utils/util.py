@@ -61,7 +61,7 @@ class CustomMetrics:
         else:
             self.metrics = [metrics]
         # Get metric names
-        self.metric_names = [met.__name__ for met in self.metrics]
+        self.metric_names = [met.name for met in self.metrics]
 
     def compute(self):
         computed_metrics = {}

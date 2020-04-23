@@ -13,34 +13,23 @@ class BaseGANTrainer(BaseTrainer):
 
     Parameters
     ----------
-    model
-        Instantiated model architecture. A subclass of `base.BaseModel`, found
-        in module `models.models`. For example `models.models.DCGAN`.
+    netD
+        Instantiated discriminator architecture. A subclass of
+        `base.BaseModel`, found in module `models.models`. For example
+        `models.models.DCGANDiscriminator`.
+    netG
+        Instantiated generator architecture. A subclass of `base.BaseModel`,
+        found in module `models.models`. For example
+        `models.models.DCGANGenerator`.
+    config
+        The configurations parsed from a JSON file.
     data_loader
         Instantiated data loader. A subclass of `base.BaseDataLoader`, defined
         in module `data_loaders.data_loaders`. For example
         `data_loaders.data_loaders.ImageNetLoader`.
-    optimizer_D
-        Instantiated optimizer for the discriminator, defined in
-        `models.optim`, which takes only trainable parameters as arguments.
-    criterion_D
-        Instantiated loss function for the discriminator, defined in
-        `model.loss`, which take only model predictions and target labels, and
-        return the computed loss.
-    metrics_D
-        Instantiated metric function for the discriminator, defined in
-        `model.metrics`, which take only model predictions and target labels,
-        and return the computed metric.
-    optimizer_G
-        Instantiated optimizer for the generator, defined in `models.optim`,
-        which takes only trainable parameters as arguments.
-    criterion_G
-        Instantiated loss function for the generator, defined in `model.loss`,
-        which take only model predictions and target labels, and return the
-        computed loss.
-    config
-        The configurations parsed from a JSON file.
-        Number of fixed noise inputs.
+    metrics
+        Instantiated metrics object, defined in `compile.metrics`, which gets
+        called every epoch and return the computed metric(s).
     callbacks : trainers.callbacks
         An early stopping callbacks, which gets called every epoch and return a
         boolean value indicating whether to stop the training process.
@@ -60,7 +49,8 @@ class BaseGANTrainer(BaseTrainer):
 
     """
 
-    def __init__(self, netD, netG, config, data_loader, callbacks=None):
+    def __init__(self, netD, netG, metrics, config, data_loader,
+                 callbacks=None):
         # Initialize BaseTrainer
         super().__init__(netD, netG, config)
         # Data loader
@@ -86,7 +76,7 @@ class BaseGANTrainer(BaseTrainer):
         self.stop = False
         # Metrics tracker. Metrics can be a single function or a list of
         # functions. Allow only discriminator to have metrics.
-        self.custom_metrics = CustomMetrics(self, netD.metric)
+        self.custom_metrics = CustomMetrics(self, metrics)
         self.tracker = MetricTracker(
             "loss_D", "loss_G", "D_x", "D_G_z1", "D_G_z2",
             *self.custom_metrics.metric_names, writer=self.writer)
@@ -205,12 +195,16 @@ class BaseGANTrainer(BaseTrainer):
             self.tracker.update("loss_G", loss_G.item())
             # Print info
             if batch_idx % self.write_logs_every == 0:
-                self.logger.debug(
-                    "{}{}\tLoss_D: {:.6f}\tLoss_G: {:.6f}\tD(x): {:.4f}\t"
-                    "D(G(z)): {:.4f}/{:.4f}".format(
+                # Default info
+                to_print = "{}{}\tLoss_D: {:.6f}\tLoss_G: {:.6f}\tD(x): " \
+                    "{:.4f}\tD(G(z)): {:.4f}/{:.4f}".format(
                         self._progress_epoch(self.epoch),
                         self._progress_batch(batch_idx), loss_D.item(),
-                        loss_G.item(), D_x, D_G_z1, D_G_z2))
+                        loss_G.item(), D_x, D_G_z1, D_G_z2)
+                # Add custom metrics
+                for met in self.custom_metrics.metrics:
+                    to_print += "\t{}".format(str(met))
+                self.logger.debug(to_print)
 
         return self.tracker.result()
 

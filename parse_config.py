@@ -275,39 +275,17 @@ def _get_kwargs(kwargs):
     return clean_kwargs
 
 
-def _get_initialized_objects(config, path, type_mapping):
-    """Helper function to initialize object from "type", "name" and "args".
-    Support initializing multiple objects (useful for `metrics`)"""
-    type_ = config["type"]
-    name = config["name"]
-    args = config["args"]
-    objs = list()
-
-    # If single entry, convert to list for convenience
-    if isinstance(type_, str):
-        type_ = [type_]
-        name = [name]
-        args = [args]
-    # If multiple entries, check if they are of the same type and length
-    else:
-        assert type(type_) == type(name) == type(args) == list
-        assert len(type_) == len(name) == len(args)
-    # Loop over all entries
-    for i in range(len(type_)):
-        # Check validity
-        if type_[i] not in type_mapping:
-            raise ValueError(
-                "Invalid type at {}. Expected one of {}, got \"{}\" "
-                "instead".format(path, list(type_mapping.keys()), type_[i]))
-        # Initialize
-        kwargs = _get_kwargs(args[i])
-        fn = getattr(type_mapping[type_[i]], name[i])
-        objs.append(fn(**kwargs))
-    if len(objs) == 1:
-        return objs[0]
-    else:
-        return objs
-
+def _get_initialized_object(config, path, type_mapping):
+    """Helper function to initialize object given "type", "name" and "args"."""
+    # Check validity
+    if config["type"] not in type_mapping:
+        raise ValueError(
+            "Invalid type at {}. Expected one of {}, got \"{}\" "
+            "instead".format(path, list(type_mapping.keys()), config["type"]))
+    # Initialize
+    kwargs = _get_kwargs(config["args"])
+    fn = getattr(type_mapping[config["type"]], config["name"])
+    return fn(**kwargs)
 
 
 def _init_all_helper(config, type_mapping, level=0, path="root",
@@ -347,10 +325,26 @@ def _init_all_helper(config, type_mapping, level=0, path="root",
         if "ignored" in config and config["ignored"]:
             return
         # Otherwise, initialize current object
-        config["obj"] = _get_initialized_objects(config, path, type_mapping)
+        config["obj"] = _get_initialized_object(config, path, type_mapping)
     # Allow function arguments to have one of ["type", "name", "args"]
     else:
+        # Handle object as a list of multiple objects.
+        if "0" in keys:
+            # Get valid keys
+            i = 0
+            while str(i) in keys:
+                i += 1
+            keys = list(map(str, range(i)))
+        # Initialize objects
         for key in keys:
             child_path = path + "->" + key
             _init_all_helper(
                 config[key], type_mapping, level + 1, child_path, is_arg=False)
+        # Post-handle multiple objects for compatibility
+        if "0" in keys:
+            objs = list()
+            for key in keys:
+                if isinstance(config[key], dict) and "obj" in config[key]:
+                    objs.append(config[key]["obj"])
+                    config[key].pop("obj", None)
+            config["obj"] = objs
