@@ -101,35 +101,37 @@ class KIDScore(FPMetric):
             # Parse trainer information if needed
             if self.value is None:
                 self.init(trainer)
-            # Generate fake samples from fixed noise
-            self.fake_samples = trainer.netG(self.fixed_noise).detach()
-            self.fake_samples = self.fake_samples.cpu().numpy()
+            # Generate fake samples from fixed noise. Keep all samples (real
+            # and generated images) on CPU for memory efficiency
+            self.fake_samples = trainer.netG(self.fixed_noise).detach().cpu()
             # KID expects input to be in random order
             self.real_idxs = np.random.permutation(self.num_samples)
             self.fake_idxs = np.random.permutation(self.num_samples)
-            real_samples = self.real_samples[self.real_idxs]
-            fake_samples = self.fake_samples[self.fake_idxs]
+            self.real_samples = self._real_samples[self.real_idxs]
+            self.fake_samples = self.fake_samples[self.fake_idxs]
             # Calculate KID score
             self.value, self.value_std = kid_utils.calculate_kid_score(
-                real_samples, fake_samples, self.model, trainer.device,
-                fe_batch_size=self.fe_batch_size,
+                self.real_samples, self.fake_samples, self.model,
+                trainer.device, fe_batch_size=self.fe_batch_size,
                 kid_batch_size=self.kid_batch_size)
 
         return self.value
 
     def init(self, trainer):
         """Parse trainer information, only used once"""
+        # Use the same device as trainer
+        self.device = trainer.device
         # Send to correct device
-        self.model = self.model.to(device=trainer.device)
+        self.model = self.model.to(device=self.device)
         # Get real samples
-        self.real_samples = trainer.data_loader.dataset.data
+        self._real_samples = trainer.data_loader.dataset.data
         # Compute number of samples
         if self.max_samples is None:
-            self.num_samples = len(self.real_samples)
+            self.num_samples = len(self._real_samples)
         else:
-            self.num_samples = min(self.max_samples, len(self.real_samples))
-        # Convert to np.ndarray
-        self.real_samples = self.real_samples[:self.num_samples]
-        self.real_samples = np.stack(self.real_samples)
+            self.num_samples = min(self.max_samples, len(self._real_samples))
+        # Convert to torch.Tensor
+        self._real_samples = self._real_samples[:self.num_samples]
+        self._real_samples = torch.stack(self._real_samples)
         self.fixed_noise = torch.randn(
-            self.num_samples, trainer.length_z, 1, 1, device=trainer.device)
+            self.num_samples, trainer.length_z, 1, 1, device=self.device)
