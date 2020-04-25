@@ -76,11 +76,11 @@ class ImageNetDataset(torch.utils.data.Dataset):
         # Get transformation function
         self.transform = transform
         # Load images
-        self.images = [self.transform(default_loader(filepath))
+        self.data = [self.transform(default_loader(filepath))
                        for filepath in self.filepaths]
 
     def __len__(self):
         return len(self.filepaths)
 
     def __getitem__(self, idx):
-        return self.images[idx]
+        return self.data[idx]

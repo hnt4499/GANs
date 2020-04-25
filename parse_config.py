@@ -163,6 +163,8 @@ class ConfigParser:
             # Compile
             "criterion": module_compile.criterion,
             "metric": module_compile.metrics,
+            "features_extractor":
+                module_compile.metrics_utils.features_extractors,
             "optimizer": module_compile.optimizers,
             # Trainer
             "trainer": module_trainers.trainers,

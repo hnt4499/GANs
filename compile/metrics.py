@@ -3,18 +3,21 @@ All functions in this module must return another function that takes a trainer
 and return the computed metric.
 """
 
+import numpy as np
 import torch
 
-from base.base_metric import BaseMetric
+from base.base_metric import BaseMetric, FPMetric
+
+from .metrics_utils import *
 
 
-class Accuracy(BaseMetric):
+class Accuracy(FPMetric):
     """Calculate accuracy of the discriminator classifying generated images.
 
     Parameters
     ----------
     name : str
-        Name of the metric, for example `acc_d`.
+        Name of the metric, for example "acc_d".
     dp : int
         Number of decimal places to be printed. (default: 4)
 
@@ -27,14 +30,7 @@ class Accuracy(BaseMetric):
 
     """
     def __init__(self, name, dp=4):
-        super(Accuracy, self).__init__(name)
-        self.dp = dp
-        self.repr = "{" + ":.{}f".format(dp) + "}"
-
-    def __str__(self):
-        # Format `self.value` to `dp` decimal places
-        num = self.repr.format(self.value)
-        return "{}: {}".format(self.name, num)
+        super(Accuracy, self).__init__(name, dp)
 
     def __call__(self, trainer):
         with torch.no_grad():
@@ -48,3 +44,92 @@ class Accuracy(BaseMetric):
             correct = torch.sum(pred == target).item()
         self.value = correct / len(target)
         return self.value
+
+
+class KIDScore(FPMetric):
+    """Calculate the KID score.
+
+    Parameters
+    ----------
+    model
+        An instantiated model defined in
+        `compile.metrics_utils.features_extractors`, which returns the
+        extracted features when called.
+    name : str
+        Name of the metric, for example "kid".
+    max_samples : int
+        Maximum number of samples to use. If None, use all samples.
+    fe_batch_size : int
+        Batch size for features extractors.
+    kid_batch_size : int
+        Batch size for KID calculation.
+    dp : int
+        Number of decimal places to be printed. (default: 4)
+
+    Attributes
+    ----------
+    value
+        The latest computed KID score (mean).
+    value_std
+        The latest computed KID score (std).
+    max_samples
+    batch_size
+    subset_size
+    num_subsets
+    name
+    dp
+
+    """
+    def __init__(self, model, name, max_samples=None, fe_batch_size=64,
+                 kid_batch_size=1024, dp=4):
+        super(KIDScore, self).__init__(name, dp)
+        # Features extraction
+        self.model = model
+        self.max_samples = max_samples
+        self.fe_batch_size = fe_batch_size
+        self.kid_batch_size = kid_batch_size
+        # Latest std
+        self.value_std = None
+
+    def __str__(self):
+        mean = self.repr.format(self.value)
+        std = self.repr.format(self.value_std)
+        return "{}: {}±{}".format(self.name, mean, std)
+
+    def __call__(self, trainer):
+        with torch.no_grad():
+            # Parse trainer information if needed
+            if self.value is None:
+                self.init(trainer)
+            # Generate fake samples from fixed noise
+            self.fake_samples = trainer.netG(self.fixed_noise).detach()
+            self.fake_samples = self.fake_samples.cpu().numpy()
+            # KID expects input to be in random order
+            self.real_idxs = np.random.permutation(self.num_samples)
+            self.fake_idxs = np.random.permutation(self.num_samples)
+            real_samples = self.real_samples[self.real_idxs]
+            fake_samples = self.fake_samples[self.fake_idxs]
+            # Calculate KID score
+            self.value, self.value_std = kid_utils.calculate_kid_score(
+                real_samples, fake_samples, self.model, trainer.device,
+                fe_batch_size=self.fe_batch_size,
+                kid_batch_size=self.kid_batch_size)
+
+        return self.value
+
+    def init(self, trainer):
+        """Parse trainer information, only used once"""
+        # Send to correct device
+        self.model = self.model.to(device=trainer.device)
+        # Get real samples
+        self.real_samples = trainer.data_loader.dataset.data
+        # Compute number of samples
+        if self.max_samples is None:
+            self.num_samples = len(self.real_samples)
+        else:
+            self.num_samples = min(self.max_samples, len(self.real_samples))
+        # Convert to np.ndarray
+        self.real_samples = self.real_samples[:self.num_samples]
+        self.real_samples = np.stack(self.real_samples)
+        self.fixed_noise = torch.randn(
+            self.num_samples, trainer.length_z, 1, 1, device=trainer.device)
