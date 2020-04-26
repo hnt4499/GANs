@@ -27,7 +27,8 @@ class BaseMetric:
 
 
 class FPMetric(BaseMetric):
-    """Base class for metrics whose value is floating point number.
+    """Base class for metrics whose value is floating point number. This base
+    class implements default behavior for __str__.
 
     Parameters
     ----------

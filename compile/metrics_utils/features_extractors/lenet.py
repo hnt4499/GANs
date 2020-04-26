@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 class LeNet5(nn.Module):
     """
-    LeNet5 implementation for features extraction.
+    LeNet5 implementation for feature extraction.
 
     Input   - 1x32x32
     c1      - 6x28x28 (5x5 kernel)
@@ -65,7 +65,7 @@ class LeNet5(nn.Module):
             param.requires_grad = False
 
     def forward(self, inp):
-        """Get Inception feature maps.
+        """Get LeNet feature maps.
 
         Parameters
         ----------
