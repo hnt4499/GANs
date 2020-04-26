@@ -1,8 +1,9 @@
 import json
-import pandas as pd
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
+
+import pandas as pd
 
 
 def ensure_dir(dirname):
@@ -62,6 +63,19 @@ class CustomMetrics:
             self.metrics = [metrics]
         # Get metric names
         self.metric_names = [met.name for met in self.metrics]
+        # Handle metrics which use the same feature extractor
+        from compile.metrics_utils.features_extractors \
+            import BaseFeatureExtractor
+        mets = [met for met in self.metrics if
+                isinstance(met, BaseFeatureExtractor)]
+        for i, met in enumerate(mets):
+            # Compare to all previous metrics
+            for j in range(i):
+                # If same class and parameters, use the existing feature
+                # extractor instead
+                if met == mets[j]:
+                    met.model = mets[j].model
+                    break
 
     def compute(self):
         computed_metrics = {}

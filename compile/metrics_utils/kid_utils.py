@@ -3,93 +3,9 @@ Code adapted from https://github.com/abdulfatir/gan-metrics-pytorch
 """
 
 import math
-from collections import OrderedDict
 
 import numpy as np
 import torch
-
-from .features_extractors import InceptionV3, LeNet5
-
-
-def calculate_kid_score(real_images, fake_images, model, device,
-                        fe_batch_size=64, kid_batch_size=1024):
-    """Calculates the KID score given two sets of images.
-
-    Parameters
-    ----------
-    real_images : numpy.ndarray
-        Input array of shape Bx3xHxW in random order. Values are expected to
-        be in range (0.0, 1.0).
-    fake_images : numpy.ndarray
-        Input array of shape Bx3xHxW in random order. Values are expected to
-        be in range (0.0, 1.0).
-    model
-        Model used for features extraction.
-    device
-    fe_batch_size : int
-        Batch size for features extractors.
-    kid_batch_size : int
-        Batch size for KID calculation.
-
-    Returns
-    -------
-    float, float
-        Mean and variance of KID score over mini batches.
-
-    """
-
-    # Extract features
-    feats_real = get_features(
-        real_images, model, device, batch_size=fe_batch_size)
-    feats_fake = get_features(
-        fake_images, model, device, batch_size=fe_batch_size)
-    # Compute KID score
-    kid_score = calculate_kid(
-        feats_fake, feats_real, device, batch_size=kid_batch_size)
-    return kid_score
-
-
-def get_features(images, model, device, batch_size=64):
-    """Helper function to extract the features (activations) for all images.
-
-    Parameters
-    ----------
-    images : numpy.ndarray
-        Input array of shape Bx3xHxW. Values are expected to be in range
-        (0.0, 1.0).
-    model
-        Model used for features extraction.
-    device
-    batch_size : int
-        Evaluation batch size.
-
-    Returns
-    -------
-    numpy.ndarray
-        Extracted features of shape (num_samples, num_features).
-
-    """
-
-    num_batches = math.ceil(len(images) / batch_size)
-    feats = list()
-
-    model.eval()
-    for i in range(num_batches):
-        start = i * batch_size
-        end = start + batch_size
-
-        images_batch = images[start:end].to(device=device)
-        feat = model(images_batch)
-        # If model output is not scalar, apply global spatial average pooling.
-        # This happens if you choose too shallow layer.
-        shape = list(feat.shape)
-        if any(s != 1 for s in shape[2:]):
-            feat = adaptive_avg_pool2d(feat, output_size=(1, 1))
-        # Flatten feature(s)
-        feat = feat.cpu().view(shape[0], -1)
-        feats.append(feat)
-
-    return torch.cat(feats, dim=0)
 
 
 def calculate_kid(fake_activations, real_activations, device, batch_size=1024):

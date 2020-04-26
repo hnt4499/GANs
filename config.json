@@ -27,11 +27,10 @@
                         "name": "bce_loss",
                         "args": {}
                     },
-                    "metric": null,
                     "weights_init": {
                         "type": "weights_init",
                         "name": "DCGAN_wi",
-                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 0.5, "bn_std": 0.02}
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
                     }
                 }
             },
@@ -41,7 +40,7 @@
                 "args": {
                     "image_size": 64,
                     "input_length": 100,
-                    "num_features": 128,
+                    "num_features": 64,
                     "num_channels": 3,
                     "conv_bias": false,
                     "optimizer": {
@@ -54,13 +53,28 @@
                         "name": "bce_loss",
                         "args": {}
                     },
-                    "metric": null,
                     "weights_init": {
                         "type": "weights_init",
                         "name": "DCGAN_wi",
-                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 0.5, "bn_std": 0.02}
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
                     }
                 }
+            },
+            "metrics": {
+                "0": {
+                    "type": "metric",
+                    "name": "KIDScore",
+                    "args": {
+                        "model": {
+                            "type": "features_extractor",
+                            "name": "InceptionV3FE",
+                            "args": {"output_block": 3, "resize_to": 299, "normalize_input": true, "batch_size": 128, "device": "cuda"}
+                        },
+                        "name": "kid", "max_samples": null, "kid_batch_size": 512, "dp": 4
+                    }
+                },
+                "comment": "This protocol is used to handle a list of objects.",
+                "comment_2": " Each metric should associate with a 0-based-index key, in the form of str, for example, \"0\", \"1\"."
             },
 
             "data_loader": {
@@ -82,7 +96,7 @@
                             }
                         }
                     },
-                    "batch_size": 32,
+                    "batch_size": 128,
                     "num_workers": 4,
                     "shuffle": true
                 }
@@ -101,11 +115,8 @@
         "save_ckpt_every": 25,
         "num_ckpt_to_keep": 5,
         "save_images_every": 5,
-        "write_logs_every": 5,
+        "write_logs_every": 1,
         "verbosity": 2,
-
-        "monitor": "off",
-        "early_stop": null,
 
         "tensorboard": true
     }
