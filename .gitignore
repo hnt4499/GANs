@@ -114,3 +114,6 @@ __MACOSX/
 
 # Pretrained models
 *.pth
+
+# Testing
+test.jpg
