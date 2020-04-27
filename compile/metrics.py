@@ -137,7 +137,7 @@ class KIDScore(FPMetric):
         # Use the same device as trainer
         self.device = trainer.device
         # Get real samples and convert to torch.Tensor
-        self.real_samples = trainer.data_loader.dataset.data[:]
+        self.real_samples = trainer.data_loader.dataset.data
         self.real_samples = torch.stack(self.real_samples)
         # Compute number of samples
         if self.max_samples is None:

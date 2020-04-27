@@ -75,12 +75,14 @@ class ImageNetDataset(torch.utils.data.Dataset):
             self.filepaths.extend(val_paths)
         # Get transformation function
         self.transform = transform
-        # Load images
-        self.data = [self.transform(default_loader(filepath))
-                       for filepath in self.filepaths]
 
     def __len__(self):
         return len(self.filepaths)
 
     def __getitem__(self, idx):
-        return self.data[idx]
+        return self.transform(default_loader(self.filepaths[idx]))
+
+    @property
+    def data(self):
+        """Return list of loaded images"""
+        return list(map(self.__getitem__, range(self.__len__())))
