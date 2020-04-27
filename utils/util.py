@@ -67,13 +67,13 @@ class CustomMetrics:
         from compile.metrics_utils.features_extractors \
             import BaseFeatureExtractor
         mets = [met for met in self.metrics if
-                isinstance(met, BaseFeatureExtractor)]
+                isinstance(getattr(met, "model", None), BaseFeatureExtractor)]
         for i, met in enumerate(mets):
             # Compare to all previous metrics
             for j in range(i):
                 # If same class and parameters, use the existing feature
                 # extractor instead
-                if met == mets[j]:
+                if met.model == mets[j].model:
                     met.model = mets[j].model
                     break
 
