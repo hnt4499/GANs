@@ -1,7 +1,3 @@
-"""
-Code adapted from https://github.com/abdulfatir/gan-metrics-pytorch
-"""
-
 import math
 
 import numpy as np
