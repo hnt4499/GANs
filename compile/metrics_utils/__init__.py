@@ -1,2 +1,2 @@
-from . import kid_utils
+from . utils import *
 from . import features_extractors

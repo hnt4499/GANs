@@ -8,7 +8,7 @@ import torch
 
 from base.base_metric import BaseMetric, FPMetric
 
-from .metrics_utils import *
+from .metrics_utils import calculate_kid
 
 
 class Accuracy(FPMetric):
@@ -126,7 +126,7 @@ class KIDScore(FPMetric):
             feats_fake = self.feats_fake[self.fake_idxs]
 
             # Compute KID from features extracted
-            self.value, self.value_std = kid_utils.calculate_kid(
+            self.value, self.value_std = calculate_kid(
                 feats_fake, feats_real, self.device,
                 batch_size=self.kid_batch_size)
 
