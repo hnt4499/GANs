@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models
 
-from .base_fe import BaseFeatureExtractor
+from .base_fe import BaseFeatureExtractor, BaseFeatureExtractorModule
 
 
 class InceptionV3FE(BaseFeatureExtractor):
@@ -13,13 +13,8 @@ class InceptionV3FE(BaseFeatureExtractor):
 
     Parameters
     ----------
-    output_block : int
-        Index of block to return features of (default: 3). Possible value
-        is:
-            0: corresponds to output of first max pooling,
-            1: corresponds to output of second max pooling,
-            2: corresponds to output which is fed to aux classifier,
-            3: corresponds to output of final average pooling.
+    output_layer : str
+        Name of the layer to output.
     resize_to : int
         If None, do not resize input images.
         If not None, bilinearly resizes input images to width and height
@@ -37,6 +32,12 @@ class InceptionV3FE(BaseFeatureExtractor):
     device : str
         String argument to pass to `torch.device`, for example, "cpu" or
         "cuda".
+    prune : bool
+        Whether to free up memory by prune unused layers. (default: False)
+    traverse_level : int
+        If None, traverse until reached terminal nodes to collect all child
+        layers.
+        Otherwise, travese up to depth `traverse_level`.
 
     Attributes
     ----------
@@ -56,12 +57,14 @@ class InceptionV3FE(BaseFeatureExtractor):
     batch_size
 
     """
-    def __init__(self, output_block=3, resize_to=None, normalize_input=True,
-                 batch_size=64, device="cpu"):
+    def __init__(self, output_layer, resize_to=None, normalize_input=True,
+                 batch_size=64, device="cpu", prune=False,
+                 traverse_level=None):
         super(InceptionV3FE, self).__init__(
             model_initializer=InceptionV3, batch_size=batch_size,
-            device=device, output_block=output_block, resize_to=resize_to,
-            normalize_input=normalize_input,
+            device=device, output_layer=output_layer, resize_to=resize_to,
+            normalize_input=normalize_input, prune=prune,
+            traverse_level=traverse_level
         )
 
     def __eq__(self, other):
@@ -72,29 +75,16 @@ class InceptionV3FE(BaseFeatureExtractor):
         return super(InceptionV3FE, self).__eq__(other)
 
 
-class InceptionV3(nn.Module):
+class InceptionV3(BaseFeatureExtractorModule):
     """Pretrained InceptionV3 for feature extraction."""
-
-    # Maps feature dimensionality to their output blocks indices
-    BLOCK_INDEX_BY_DIM = {
-        64: 0,   # First max pooling features
-        192: 1,  # Second max pooling featurs
-        768: 2,  # Pre-aux classifier features
-        2048: 3  # Final average pooling features
-    }
-
-    def __init__(self, output_block=3, resize_to=None, normalize_input=True):
+    def __init__(self, output_layer, resize_to=None, normalize_input=True,
+                 prune=False, traverse_level=None):
         """Build pretrained InceptionV3.
 
         Parameters
         ----------
-        output_block : int
-            Index of block to return features of (default: 3). Possible value
-            is:
-                0: corresponds to output of first max pooling,
-                1: corresponds to output of second max pooling,
-                2: corresponds to output which is fed to aux classifier,
-                3: corresponds to output of final average pooling.
+        output_layer : str
+            Name of the layer to output.
         resize_to : int
             If None, do not resize input images.
             If not None, bilinearly resizes input images to width and height
@@ -106,67 +96,65 @@ class InceptionV3(nn.Module):
         normalize_input : bool
             If true, scales the input from range (0, 1) to the range the
             pretrained Inception network expects, namely (-1, 1).
+        prune : bool
+            Whether to free up memory by prune unused layers. (default: False)
+        traverse_level : int
+            If None, traverse until reached terminal nodes to collect all child
+            layers.
+            Otherwise, travese up to depth `traverse_level`.
+
         """
-        super(InceptionV3, self).__init__()
+        super(InceptionV3, self).__init__(
+            output_layer=output_layer, traverse_level=traverse_level)
 
-        if output_block not in self.BLOCK_INDEX_BY_DIM.values():
-            raise ValueError(
-                "Invalid index of output block. Expected one of {}, got {} "
-                "instead.".format(
-                    list(self.BLOCK_INDEX_BY_DIM.values()), output_block))
-
-        self.output_block = output_block
         self.resize_to = resize_to
         self.normalize_input = normalize_input
 
         inception = models.inception_v3(pretrained=True)
-        self.blocks = nn.ModuleList()
 
-        # Block 0: input to maxpool1
-        block0 = [
-            inception.Conv2d_1a_3x3,
-            inception.Conv2d_2a_3x3,
-            inception.Conv2d_2b_3x3,
-            nn.MaxPool2d(kernel_size=3, stride=2)
+        layers = [
+            # Block 0: input to maxpool1
+            "Conv2d_1a_3x3",
+            "Conv2d_2a_3x3",
+            "Conv2d_2b_3x3",
+            ("MaxPool_1", nn.MaxPool2d(kernel_size=3, stride=2)),
+
+            # Block 1: maxpool1 to maxpool2
+            "Conv2d_3b_1x1",
+            "Conv2d_4a_3x3",
+            ("MaxPool_2", nn.MaxPool2d(kernel_size=3, stride=2)),
+
+            # Block 2: maxpool2 to aux classifier
+            "Mixed_5b",
+            "Mixed_5c",
+            "Mixed_5d",
+            "Mixed_6a",
+            "Mixed_6b",
+            "Mixed_6c",
+            "Mixed_6d",
+            "Mixed_6e",
+
+            # Block 3: aux classifier to final avgpool
+            "Mixed_7a",
+            "Mixed_7b",
+            "Mixed_7c",
+            ("AAPool", nn.AdaptiveAvgPool2d(output_size=(1, 1))),
         ]
-        self.blocks.append(nn.Sequential(*block0))
-
-        # Block 1: maxpool1 to maxpool2
-        if self.output_block >= 1:
-            block1 = [
-                inception.Conv2d_3b_1x1,
-                inception.Conv2d_4a_3x3,
-                nn.MaxPool2d(kernel_size=3, stride=2)
-            ]
-            self.blocks.append(nn.Sequential(*block1))
-
-        # Block 2: maxpool2 to aux classifier
-        if self.output_block >= 2:
-            block2 = [
-                inception.Mixed_5b,
-                inception.Mixed_5c,
-                inception.Mixed_5d,
-                inception.Mixed_6a,
-                inception.Mixed_6b,
-                inception.Mixed_6c,
-                inception.Mixed_6d,
-                inception.Mixed_6e,
-            ]
-            self.blocks.append(nn.Sequential(*block2))
-
-        # Block 3: aux classifier to final avgpool
-        if self.output_block >= 3:
-            block3 = [
-                inception.Mixed_7a,
-                inception.Mixed_7b,
-                inception.Mixed_7c,
-                nn.AdaptiveAvgPool2d(output_size=(1, 1))
-            ]
-            self.blocks.append(nn.Sequential(*block3))
+        for layer in layers:
+            if isinstance(layer, str):
+                module = getattr(inception, layer)
+                self.__setattr__(layer, module)
+            else:
+                # Pooling layers
+                self.__setattr__(layer[0], layer[1])
 
         # Turn off gradients completely
         for param in self.parameters():
             param.requires_grad = False
+
+        # Prune unused layers
+        if prune:
+            self._prune_and_update_mapping()
 
     def forward(self, inp):
         """Get Inception feature maps.
@@ -192,7 +180,6 @@ class InceptionV3(nn.Module):
         if self.normalize_input:
             x = 2 * x - 1
         # Feed-forward
-        for idx in range(self.output_block + 1):
-            x = self.blocks[idx](x)
+        output = self._forward(inp)
 
-        return x
+        return output

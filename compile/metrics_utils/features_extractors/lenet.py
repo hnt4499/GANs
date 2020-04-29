@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 
-from .base_fe import BaseFeatureExtractor
+from .base_fe import BaseFeatureExtractor, BaseFeatureExtractorModule
 
 
 class LeNet5FE(BaseFeatureExtractor):
@@ -20,6 +20,8 @@ class LeNet5FE(BaseFeatureExtractor):
     ----------
     model_path : str
         Path to the pretrained model.
+    output_layer : str
+        Name of the layer to output.
     resize_to : int
         If None, do not resize input images.
         If not None, bilinearly resizes input images to width and height
@@ -34,6 +36,12 @@ class LeNet5FE(BaseFeatureExtractor):
     device : str
         String argument to pass to `torch.device`, for example, "cpu" or
         "cuda".
+    prune : bool
+        Whether to free up memory by prune unused layers. (default: False)
+    traverse_level : int
+        If None, traverse until reached terminal nodes to collect all child
+        layers.
+        Otherwise, travese up to depth `traverse_level`.
 
     Attributes
     ----------
@@ -53,11 +61,12 @@ class LeNet5FE(BaseFeatureExtractor):
     batch_size
 
     """
-    def __init__(self, model_path, resize_to=None, batch_size=64,
-                 device="cpu"):
+    def __init__(self, model_path, output_layer, resize_to=None, batch_size=64,
+                 device="cpu", prune=False, traverse_level=None):
         super(LeNet5FE, self).__init__(
             model_initializer=LeNet5, batch_size=batch_size, device=device,
-            model_path=model_path, resize_to=resize_to,
+            model_path=model_path, output_layer=output_layer,
+            resize_to=resize_to, prune=prune, traverse_level=traverse_level
         )
 
     def __eq__(self, other):
@@ -68,7 +77,7 @@ class LeNet5FE(BaseFeatureExtractor):
         return super(LeNet5FE, self).__eq__(other)
 
 
-class LeNet5(nn.Module):
+class LeNet5(BaseFeatureExtractorModule):
     """
     LeNet5 implementation for feature extraction.
 
@@ -87,14 +96,16 @@ class LeNet5(nn.Module):
     f7      - 10
     softmax (output)
     """
-    def __init__(self, model_path, resize_to=None):
+    def __init__(self, model_path, output_layer, resize_to=None, prune=False,
+                 traverse_level=None):
         """Initialize LeNet model.
 
         Parameters
         ----------
         model_path : str
             Path to the pretrained LeNet5 model.
-
+        output_layer : str
+            Name of the layer to output.
         resize_to : int
             If None, do not resize input images.
             If not None, bilinearly resizes input images to width and height
@@ -103,9 +114,16 @@ class LeNet5(nn.Module):
             convolutional, it should be able to handle inputs of arbitrary
             size, so resizing might not be strictly needed. If needed, the
             images should be resized to (32, 32).
+        prune : bool
+            Whether to free up memory by prune unused layers. (default: False)
+        traverse_level : int
+            If None, traverse until reached terminal nodes to collect all child
+            layers.
+            Otherwise, travese up to depth `traverse_level`.
 
         """
-        super(LeNet5, self).__init__()
+        super(LeNet5, self).__init__(
+            output_layer=output_layer, traverse_level=traverse_level)
         self.model_path = model_path
         self.resize_to = resize_to
 
@@ -140,6 +158,10 @@ class LeNet5(nn.Module):
             transforms.ToTensor(),
         ])
 
+        # Prune unused layers
+        if prune:
+            self._prune_and_update_mapping()
+
     def forward(self, inp):
         """Get LeNet feature maps.
 
@@ -162,10 +184,8 @@ class LeNet5(nn.Module):
             inp = F.interpolate(
                 inp, size=(self.resize_to, self.resize_to), mode='bilinear',
                 align_corners=False)
-        # Feed forward
-        output = self.convnet(inp)
-        output = output.view(inp.size(0), -1)
-        output = self.fc[1](self.fc[0](output))
+        # Forward
+        output = self._forward(inp)
         return output
 
     def _transform(self, inp):

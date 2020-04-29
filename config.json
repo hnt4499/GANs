@@ -68,12 +68,26 @@
                         "model": {
                             "type": "features_extractor",
                             "name": "InceptionV3FE",
-                            "args": {"output_block": 3, "resize_to": 299, "normalize_input": true, "batch_size": 128, "device": "cuda"}
+                            "args": {"output_layer": "Mixed_6e", "resize_to": null, "normalize_input": true,
+                                     "batch_size": 128, "device": "cuda", "prune": false, "traverse_level": 1}
                         },
-                        "name": "kid", "max_samples": null, "kid_batch_size": 512, "dp": 4
+                        "name": "kid_inception", "max_samples": null, "kid_batch_size": 512, "dp": 4
                     }
                 },
-                "comment": "This protocol is used to handle a list of objects.",
+                "1": {
+                    "type": "metric",
+                    "name": "KIDScore",
+                    "args": {
+                        "model": {
+                            "type": "features_extractor",
+                            "name": "LeNet5FE",
+                            "args": {"model_path": "compile/metrics_utils/features_extractors/lenet.pth", "resize_to": null,
+                                     "output_layer": "convnet.tanh5", "batch_size": 128, "device": "cuda", "prune": true, "traverse_level": null}
+                        },
+                        "name": "kid_lenet", "max_samples": null, "kid_batch_size": 512, "dp": 4
+                    }
+                },
+                "comment": "This protocol is used to handle arguments as a list of objects.",
                 "comment_2": " Each metric should associate with a 0-based-index key, in the form of str, for example, \"0\", \"1\"."
             },
 

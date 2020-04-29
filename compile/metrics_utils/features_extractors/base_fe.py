@@ -1,6 +1,10 @@
+import sys
+import six
 import math
+from collections import OrderedDict
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 
@@ -129,3 +133,141 @@ class BaseFeatureExtractor:
             if other_value != this_value:
                 return False
         return True
+
+
+class BaseFeatureExtractorModule(nn.Module):
+    """Base class for feature extractors modules, which wraps any subclass of
+    `nn.Module` and implements a convenience protocol to output any
+    intermediate layer of the wrapped module, as well as to raise more
+    informative exception when a RuntimeError is catched.
+
+    Parameters
+    ----------
+    output_layer : str
+        Name of the layer (one of the children modules) to ouput.
+    traverse_level : int
+        If None, traverse until reached terminal nodes to collect all child
+        layers.
+        Otherwise, travese up to depth `traverse_level`.
+
+    Attributes
+    ----------
+    mods : dict
+        A dictionary mapping layer' names with its respective module.
+    output_layer
+    traverse_level
+
+    """
+    def __init__(self, output_layer, traverse_level=None):
+        super(BaseFeatureExtractorModule, self).__init__()
+        self.mods = OrderedDict()
+        self.output_layer = output_layer
+        self.traverse_level = traverse_level
+
+    def __setattr__(self, name, value):
+        """Set an attribute as in its parent class `nn.module` and build the
+        mapping at the same time"""
+        # Set module as in parent class `nn.Module`
+        super(BaseFeatureExtractorModule, self).__setattr__(name, value)
+        # Keep track and build the mapping at the same time
+        if isinstance(value, nn.Module):
+            if isinstance(self.traverse_level, int):
+                # Already 1 level down
+                level = self.traverse_level - 1
+            else:
+                level = None
+            self._build_mapping(value, path=[name], level=level)
+
+    def _build_mapping(self, module, path=list(), level=None):
+        """Helper function to recursively read current module and build the
+        mapping from it"""
+        # Reached terminal node
+        if (not has_children(module)) or (level is not None and level == 0):
+            path = ".".join(path)
+            self.mods[path] = module
+        # Recursively traverse to its child nodes
+        else:
+            for child_name, child_module in module.named_children():
+                if level is not None:
+                    level -= 1
+                # Get child's children
+                child_path = path + [child_name]
+                self._build_mapping(child_module, child_path, level)
+
+    def _prune_and_update_mapping(self):
+        """Prune unused layers for memory efficiency then update the mapping"""
+        # Verify that `output_layer` is a valid layer name
+        if self.output_layer not in self.mods:
+            raise ValueError(
+                "Invalid output layer name. Expected one of {}, got '{}' "
+                "instead.".format(list(self.mods.keys()), self.output_layer))
+        # Prune unused layers, travese backwards
+        for mod_name in list(self.mods.keys())[::-1]:
+            if mod_name == self.output_layer:
+                break
+            path = mod_name.split(".")
+            prune(self, path)
+        # Free up cache
+        torch.cuda.empty_cache()
+        # Update mapping
+        self.mods = OrderedDict()
+        self._build_mapping(self, level=self.traverse_level)
+
+    def _forward(self, inp):
+        """Base function that takes an input tensor and return output at the
+        "output_layer" layer. Any RuntimeError (e.g., size mismatch) will be
+        catched and re-raised with more information.
+        Subclass's forward function should only wrap this function, e.g.,
+        pre-process inputs."""
+        # Verify that `output_layer` is a valid layer name
+        if self.output_layer not in self.mods:
+            raise ValueError(
+                "Invalid output layer name. Expected one of {}, got '{}' "
+                "instead.".format(list(self.mods.keys()), self.output_layer))
+
+        output = inp
+        last_mod_name = None
+        for mod_name, mod in self.mods.items():
+            # More informative RuntimeError
+            try:
+                output = mod(output)
+            except RuntimeError:
+                # Re-raise exception with more information
+                t, v, tb = sys.exc_info()
+                msg = ("{}\nError catched at layer '{}'. Last successful "
+                       "layer is '{}'".format(v, mod_name, last_mod_name))
+                v = RuntimeError(msg)
+                six.reraise(t, v, tb)
+            last_mod_name = mod_name
+            # Stop if reached
+            if mod_name == self.output_layer:
+                return output
+
+
+"""
+Helper functions to handle sub-modules (layers) of a
+`BaseFeatureExtractorModule`
+"""
+
+
+def has_children(module):
+    """Helper function to check whether a module has children or not"""
+    for child in module.named_children():
+        return True
+    return False
+
+
+def prune(module, path):
+    """Helper function to prune a sub-module given its path"""
+    # Continue traversing
+    if len(path) > 1:
+        child_name = path[0]
+        child_module = getattr(module, child_name)
+        prune(child_module, path[1:])
+        # Prune next node if it is empty after its children have been removed
+        # This is to ensure that pruning does not leave any trace
+        if not has_children(child_module):
+            delattr(module, child_name)
+    # Prune next node
+    else:
+        delattr(module, path[0])
