@@ -69,7 +69,7 @@
                             "type": "features_extractor",
                             "name": "InceptionV3FE",
                             "args": {"output_layer": "Mixed_6e", "resize_to": null, "normalize_input": true,
-                                     "batch_size": 128, "device": "cuda", "prune": false, "traverse_level": 1}
+                                     "batch_size": 128, "device": "cuda", "prune": true, "traverse_level": 1}
                         },
                         "name": "kid_inception", "max_samples": null, "kid_batch_size": 512, "dp": 4
                     }

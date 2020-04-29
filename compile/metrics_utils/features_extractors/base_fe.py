@@ -182,17 +182,16 @@ class BaseFeatureExtractorModule(nn.Module):
         """Helper function to recursively read current module and build the
         mapping from it"""
         # Reached terminal node
-        if (not has_children(module)) or (level is not None and level == 0):
+        if (not has_children(module)) or level == 0:
             path = ".".join(path)
             self.mods[path] = module
         # Recursively traverse to its child nodes
         else:
             for child_name, child_module in module.named_children():
-                if level is not None:
-                    level -= 1
+                child_level = None if level is None else level - 1
                 # Get child's children
                 child_path = path + [child_name]
-                self._build_mapping(child_module, child_path, level)
+                self._build_mapping(child_module, child_path, child_level)
 
     def _prune_and_update_mapping(self):
         """Prune unused layers for memory efficiency then update the mapping"""
