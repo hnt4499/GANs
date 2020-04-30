@@ -8,7 +8,7 @@ import torch
 
 from base.base_metric import FPMetric, FEMetric
 
-from .metrics_utils import calculate_kid
+from .metrics_utils import calculate_kid, calculate_fid
 
 
 class Accuracy(FPMetric):
@@ -90,6 +90,41 @@ class KIDScore(FEMetric):
 
     def _calc_score(self, feats_real, feats_fake):
         self.value, self.value_std = calculate_kid(
-            feats_real, feats_fake, device=self.device,
+            feats_fake, feats_real, device=self.device,
             batch_size=self.kid_batch_size)
+        return self.value
+
+
+class FIDScore(FEMetric):
+    """Calculate the FID score.
+
+    Parameters
+    ----------
+    model
+        An instantiated model defined in
+        `compile.metrics_utils.features_extractors`, which returns the
+        extracted features when called.
+    name : str
+        Name of the metric, for example "fid".
+    max_samples : int
+        Maximum number of samples to use. If None, use all samples.
+    dp : int
+        Number of decimal places to be printed. (default: 4)
+
+    Attributes
+    ----------
+    value
+        The latest computed FID score.
+    max_samples
+    name
+    dp
+
+    """
+    def __init__(self, model, name, max_samples=None, dp=4):
+        super(FIDScore, self).__init__(
+            model=model, name=name, max_samples=max_samples, dp=dp)
+
+    def _calc_score(self, feats_real, feats_fake):
+        self.value = calculate_fid(
+            feats_fake, feats_real, device=self.device)
         return self.value
