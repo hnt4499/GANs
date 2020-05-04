@@ -69,3 +69,68 @@ class BaseGANComponent(BaseModel):
         # Initialize model weights
         if self.weights_init is not None:
             self.apply(self.weights_init)
+
+
+class BaseGANDiscriminator(BaseGANComponent):
+    """Base class for all GAN discriminators.
+
+    Parameters
+    ----------
+    optimizer : fn
+        A function initialized in `compile.optimizers` that takes only the
+        model trainable parameters as input.
+    criterion : fn
+        A function initialized in `compile.criterion` that takes the model
+        predictions and target labels, and return the computed loss.
+    metric : fn
+        A function initialized in `compile.metrics` that takes the model
+        predictions and target labels, and return the computed metric.
+    weights_init : fn
+        A function initialized in `models.weights_init` that will then be
+        passed to `model.apply()`.
+
+    Attributes
+    ----------
+    optimizer
+    criterion
+    metric
+    weights_init
+
+    """
+
+
+class BaseGANGenerator(BaseGANComponent):
+    """Base class for all GAN discriminators.
+
+    Parameters
+    ----------
+    optimizer : fn
+        A function initialized in `compile.optimizers` that takes only the
+        model trainable parameters as input.
+    criterion : fn
+        A function initialized in `compile.criterion` that takes the model
+        predictions and target labels, and return the computed loss.
+    metric : fn
+        A function initialized in `compile.metrics` that takes the model
+        predictions and target labels, and return the computed metric.
+    weights_init : fn
+        A function initialized in `models.weights_init` that will then be
+        passed to `model.apply()`.
+    output_range : tuple
+        Tuple of (`min_value`, `max_value`) representing the output range of
+        the generator. (-1.0, 1.0) by default, which is the output range of the
+        Tanh layer.
+
+    Attributes
+    ----------
+    optimizer
+    criterion
+    metric
+    weights_init
+
+    """
+    def __init__(self, optimizer, criterion, weights_init=None,
+                 output_range=(-1.0, 1.0)):
+        super(BaseGANGenerator, self).__init__(
+            optimizer, criterion, weights_init)
+        self.output_range = output_range

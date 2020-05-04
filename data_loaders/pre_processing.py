@@ -17,19 +17,10 @@ def _DCGAN_get_value(x):
             "length 3. Got {} instead.".format(type(x)))
 
 
-def DCGAN_transform(image_size=64, mean=0.0, std=1.0):
+def DCGAN_transform(image_size=64, mean=0.5, std=0.5):
     """Return an image transformer as described in the DCGAN paper, which
     resizes, center-crops and normalizes input image to the range [-1, 1]
     corresponding to the range of the output of the Tanh function.
-        By default `mean=0.0` and `std=1.0`, meaning that the images will be
-        normalized to the range [-1, 1], corresponding to the range of the
-        output of the Tanh function, as described in the DCGAN paper:
-            Radford, A., Metz, L., & Chintala, S. (2016). Unsupervised
-            Representation Learning with Deep Convolutional Generative
-            Adversarial Networks.
-        Set `mean=0.5` and `std=0.5` to use the transformation as implemented
-        in the PyTorch tutorial on DCGAN, which normalizes to the range [0, 1]:
-            https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html
 
     Parameters
     ----------

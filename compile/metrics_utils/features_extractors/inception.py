@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torchvision import models
 
 from .base_fe import BaseFeatureExtractor, BaseFeatureExtractorModule
+from .utils import normalize
 
 
 class InceptionV3FE(BaseFeatureExtractor):
@@ -24,8 +25,13 @@ class InceptionV3FE(BaseFeatureExtractor):
         size, so resizing might not be strictly needed. If needed, the
         images should be resized to (299, 299).
     normalize_input : bool
-        If true, scales the input from range (0, 1) to the range the
-        pretrained Inception network expects, namely (-1, 1).
+        If true, automatically normalize inputs to the range the pretrained
+        Inception network expects.
+    transform_input : bool
+        If true, further normalize inputs to have
+        `mean = [0.485, 0.456, 0.406]` and `std = [0.229, 0.224, 0.225]` as
+        described in the PyTorch documentation
+        (https://pytorch.org/docs/stable/torchvision/models.html).
 
     batch_size : int
         Mini-batch size for feature extractor.
@@ -58,13 +64,13 @@ class InceptionV3FE(BaseFeatureExtractor):
 
     """
     def __init__(self, output_layer, resize_to=None, normalize_input=True,
-                 batch_size=64, device="cpu", prune=False,
-                 traverse_level=None):
+                 transform_input=True, batch_size=64, device="cpu",
+                 prune=False, traverse_level=None):
         super(InceptionV3FE, self).__init__(
             model_initializer=InceptionV3, batch_size=batch_size,
             device=device, output_layer=output_layer, resize_to=resize_to,
-            normalize_input=normalize_input, prune=prune,
-            traverse_level=traverse_level
+            normalize_input=normalize_input, transform_input=transform_input,
+            prune=prune, traverse_level=traverse_level
         )
 
     def __eq__(self, other):
@@ -78,7 +84,7 @@ class InceptionV3FE(BaseFeatureExtractor):
 class InceptionV3(BaseFeatureExtractorModule):
     """Pretrained InceptionV3 for feature extraction."""
     def __init__(self, output_layer, resize_to=None, normalize_input=True,
-                 prune=False, traverse_level=None):
+                 transform_input=True, prune=False, traverse_level=None):
         """Build pretrained InceptionV3.
 
         Parameters
@@ -94,8 +100,13 @@ class InceptionV3(BaseFeatureExtractorModule):
             size, so resizing might not be strictly needed. If needed, the
             images should be resized to (299, 299).
         normalize_input : bool
-            If true, scales the input from range (0, 1) to the range the
-            pretrained Inception network expects, namely (-1, 1).
+            If true, automatically normalize inputs to the range the pretrained
+            Inception network expects.
+        transform_input : bool
+            If true, further normalize inputs to have
+            `mean = [0.485, 0.456, 0.406]` and `std = [0.229, 0.224, 0.225]` as
+            described in the PyTorch documentation
+            (https://pytorch.org/docs/stable/torchvision/models.html).
         prune : bool
             Whether to free up memory by prune unused layers. (default: False)
         traverse_level : int
@@ -109,6 +120,7 @@ class InceptionV3(BaseFeatureExtractorModule):
 
         self.resize_to = resize_to
         self.normalize_input = normalize_input
+        self.transform_input = transform_input
 
         inception = models.inception_v3(pretrained=True)
 
@@ -156,14 +168,26 @@ class InceptionV3(BaseFeatureExtractorModule):
         if prune:
             self._prune_and_update_mapping()
 
-    def forward(self, inp):
+    def _transform_input(self, x):
+        x_ch0 = (torch.unsqueeze(x[:, 0], 1) * (0.229 / 0.5)
+                 + (0.485 - 0.5) / 0.5)
+        x_ch1 = (torch.unsqueeze(x[:, 1], 1) * (0.224 / 0.5)
+                 + (0.456 - 0.5) / 0.5)
+        x_ch2 = (torch.unsqueeze(x[:, 2], 1) * (0.225 / 0.5)
+                 + (0.406 - 0.5) / 0.5)
+        x = torch.cat((x_ch0, x_ch1, x_ch2), 1)
+        return x
+
+    def forward(self, trainer, inp):
         """Get Inception feature maps.
 
         Parameters
         ----------
         inp : torch.autograd.Variable
-            Input tensor of shape Bx3xHxW. Values are expected to be in
-            range (0.0, 1.0).
+            Input tensor of shape Bx3xHxW.
+            If `self.normalize_input` is True, automatically normalize input
+            based on generator's output range and Inception 's input range.
+            Otherwise, values are expected to be in range (0.0, 1.0).
 
         Returns
         -------
@@ -176,10 +200,15 @@ class InceptionV3(BaseFeatureExtractorModule):
         if self.resize_to is not None:
             x = F.interpolate(x, size=(self.resize_to, self.resize_to),
                               mode='bilinear', align_corners=False)
-        # Scale from range (0, 1) to range (-1, 1)
+        # Automatically normalize input
         if self.normalize_input:
-            x = 2 * x - 1
+            x = normalize(x, in_range=trainer.netG.output_range,
+                          out_range=(0.0, 1.0))
+        # Further transform input
+        if self.transform_input:
+            x = self._transform_input(x)
+        print(x.shape, x.min(), x.max(), x.mean())
         # Feed-forward
-        output = self._forward(inp)
+        output = self._forward(x)
 
         return output

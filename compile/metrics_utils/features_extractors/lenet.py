@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torchvision import transforms
 
 from .base_fe import BaseFeatureExtractor, BaseFeatureExtractorModule
+from .utils import normalize
 
 
 class LeNet5FE(BaseFeatureExtractor):
@@ -22,6 +23,9 @@ class LeNet5FE(BaseFeatureExtractor):
         Path to the pretrained model.
     output_layer : str
         Name of the layer to output.
+    normalize_input : bool
+        If true, automatically normalize inputs to the range the pretrained
+        LeNet network expects.
     resize_to : int
         If None, do not resize input images.
         If not None, bilinearly resizes input images to width and height
@@ -61,12 +65,14 @@ class LeNet5FE(BaseFeatureExtractor):
     batch_size
 
     """
-    def __init__(self, model_path, output_layer, resize_to=None, batch_size=64,
-                 device="cpu", prune=False, traverse_level=None):
+    def __init__(self, model_path, output_layer, normalize_input=True,
+                 resize_to=None, batch_size=64, device="cpu", prune=False,
+                 traverse_level=None):
         super(LeNet5FE, self).__init__(
             model_initializer=LeNet5, batch_size=batch_size, device=device,
             model_path=model_path, output_layer=output_layer,
-            resize_to=resize_to, prune=prune, traverse_level=traverse_level
+            normalize_input=normalize_input, resize_to=resize_to, prune=prune,
+            traverse_level=traverse_level
         )
 
     def __eq__(self, other):
@@ -96,8 +102,8 @@ class LeNet5(BaseFeatureExtractorModule):
     f7      - 10
     softmax (output)
     """
-    def __init__(self, model_path, output_layer, resize_to=None, prune=False,
-                 traverse_level=None):
+    def __init__(self, model_path, output_layer, normalize_input=True,
+                 resize_to=None, prune=False, traverse_level=None):
         """Initialize LeNet model.
 
         Parameters
@@ -106,6 +112,9 @@ class LeNet5(BaseFeatureExtractorModule):
             Path to the pretrained LeNet5 model.
         output_layer : str
             Name of the layer to output.
+        normalize_input : bool
+            If true, automatically normalize inputs to the range the pretrained
+            LeNet network expects.
         resize_to : int
             If None, do not resize input images.
             If not None, bilinearly resizes input images to width and height
@@ -125,6 +134,7 @@ class LeNet5(BaseFeatureExtractorModule):
         super(LeNet5, self).__init__(
             output_layer=output_layer, traverse_level=traverse_level)
         self.model_path = model_path
+        self.normalize_input = normalize_input
         self.resize_to = resize_to
 
         self.convnet = nn.Sequential(OrderedDict([
@@ -162,11 +172,13 @@ class LeNet5(BaseFeatureExtractorModule):
         if prune:
             self._prune_and_update_mapping()
 
-    def forward(self, inp):
+    def forward(self, trainer, inp):
         """Get LeNet feature maps.
 
         Parameters
         ----------
+        trainer
+            Current trainer state.
         inp : torch.autograd.Variable
             Input tensor of shape Bx3x32x32, resized if needed. Values are
             expected to be in range (0.0, 1.0).
@@ -176,6 +188,10 @@ class LeNet5(BaseFeatureExtractorModule):
         torch.autograd.Variable
             The features extracted from the first fully-connected layer.
         """
+        # Normalize input
+        if self.normalize_input:
+            inp = normalize(
+                inp, in_range=trainer.netG.output_range, out_range=(0.0, 1.0))
         # Convert to grayscale if needed
         if inp.shape[1] == 3:
             inp = self._transform(inp)

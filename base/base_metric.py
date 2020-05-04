@@ -115,9 +115,11 @@ class FEMetric(FPMetric):
         features to be identical."""
         # Use `id=0` for real samples because we need to compute only once;
         # use current batch index as `id` for fake samples
-        self.feats_real = self.model(real_samples, real=True, id=0)
+        self.feats_real = self.model(
+            self.trainer, real_samples, real=True, id=0)
         self.feats_fake = self.model(
-            fake_samples, real=False, id=self.trainer.current_batch.batch_idx)
+            self.trainer, fake_samples, real=False,
+            id=self.trainer.current_batch.batch_idx)
         return self.feats_real, self.feats_fake
 
     def _get_shuffled_feats(self, feats_real, feats_fake):

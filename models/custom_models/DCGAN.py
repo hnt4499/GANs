@@ -3,10 +3,10 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 
-from base import BaseGANComponent
+from base import BaseGANDiscriminator, BaseGANGenerator
 
 
-class DCGANDiscriminator(BaseGANComponent):
+class DCGANDiscriminator(BaseGANDiscriminator):
     """DCGAN Discriminator. Note that all layers are channel-first.
     Adapted from:
         https://github.com/pytorch/examples/blob/master/dcgan/main.py#L164
@@ -98,7 +98,7 @@ class DCGANDiscriminator(BaseGANComponent):
         return self.fw(x)
 
 
-class DCGANGenerator(BaseGANComponent):
+class DCGANGenerator(BaseGANGenerator):
     """DCGAN Generator. Note that all layers are channel-first.
     Adapted from:
         https://github.com/pytorch/examples/blob/master/dcgan/main.py#L122
@@ -135,7 +135,7 @@ class DCGANGenerator(BaseGANComponent):
                  conv_bias, optimizer, criterion, weights_init=None):
 
         super(DCGANGenerator, self).__init__(
-            optimizer, criterion, weights_init)
+            optimizer, criterion, weights_init, output_range=(-1.0, 1.0))
 
         # Cache data
         self.image_size = image_size

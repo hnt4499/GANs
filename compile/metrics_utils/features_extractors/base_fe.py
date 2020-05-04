@@ -61,7 +61,7 @@ class BaseFeatureExtractor:
         self.id_fake = None
         self.feats_fake = None
 
-    def __call__(self, x, id, real=True):
+    def __call__(self, trainer, x, id, real=True):
         """Base function for feed-forwarding input. Overwrite if needed.
 
         Parameters
@@ -84,17 +84,19 @@ class BaseFeatureExtractor:
             # Compute new batch of inputs
             if self.id_real is None or self.id_real != id:
                 self.id_real = id  # update current ID
-                self.feats_real = self._forward(x)  # update real features
+                # Update real features
+                self.feats_real = self._forward(trainer, x)
             return self.feats_real
         # Fake samples
         else:
             # Compute new batch of inputs
             if self.id_fake is None or self.id_fake != id:
                 self.id_fake = id  # update current ID
-                self.feats_fake = self._forward(x)  # update fake features
+                # Update fake features
+                self.feats_fake = self._forward(trainer, x)
             return self.feats_fake
 
-    def _forward(self, x):
+    def _forward(self, trainer, x):
         """Helper function to forward batched inputs"""
         num_samples = x.shape[0]
         num_batches = math.ceil(num_samples / self.batch_size)
@@ -105,7 +107,7 @@ class BaseFeatureExtractor:
             start = batch * self.batch_size
             end = start + self.batch_size
 
-            feat = self.model(x[start:end].to(device=self.device))
+            feat = self.model(trainer, x[start:end].to(device=self.device))
             # If model output is not scalar, apply global spatial average
             # pooling. This happens if you choose too shallow layer.
             shape = list(feat.shape)
