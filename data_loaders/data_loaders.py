@@ -20,5 +20,5 @@ class ImageNetLoader(BaseDataLoader):
     """
     def __init__(self, dataset, batch_size=128, shuffle=True, num_workers=1):
         self.dataset = dataset
-        super().__init__(self.dataset, batch_size, shuffle,
-                         validation_split=0.0, num_workers=num_workers)
+        super().__init__(
+            self.dataset, batch_size, shuffle, num_workers=num_workers)
