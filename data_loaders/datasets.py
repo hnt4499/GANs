@@ -1,63 +1,44 @@
 import os
 
 import pandas as pd
-import torch
-from PIL import Image
+
+from base import BaseDataset
 
 
-def pil_loader(path):
-    # open path as file to avoid ResourceWarning
-    # (https://github.com/python-pillow/Pillow/issues/835)
-    with open(path, 'rb') as f:
-        img = Image.open(f)
-        return img.convert('RGB')
-
-
-def accimage_loader(path):
-    import accimage
-    try:
-        return accimage.Image(path)
-    except IOError:
-        # Potentially a decoding problem, fall back to PIL.Image
-        return pil_loader(path)
-
-
-def default_loader(path):
-    """Default image reader."""
-    from torchvision import get_image_backend
-    if get_image_backend() == 'accimage':
-        return accimage_loader(path)
-    else:
-        return pil_loader(path)
-
-
-class ImageNetDataset(torch.utils.data.Dataset):
+class ImageNetDataset(BaseDataset):
     """ImageNet dataset reader.
 
     Parameters
     ----------
     root : str
-        Root directory of the ImageNet dataset.
+        Root directory of the ImageNet dataset, with the following tree
+        structure:
+            root
+            ├── ILSVRC
+            │   ├── Annotations
+            │   ├── Data
+            │   └── ImageSets
+            ├── LOC_sample_submission.csv
+            ├── LOC_synset_mapping.txt
+            ├── LOC_train_solution.csv
+            └── LOC_val_solution.csv
     cls : str
         A ImageNet class name, for example "n01531178", which corresponds to
         "goldfinch".
-    transform : str
+    transform : fn
         A function in `pre_processing.py` to be taken as the custom image
         transformation function.
     include_val : bool
         Whether to include images from validation set.
 
     """
-    def __init__(self, root, cls, transform, include_val=False):
-        super(ImageNetDataset).__init__()
-        # Get train filepaths
-        train_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/train")
-        train_dir = os.path.join(train_dir, cls)
-        train_names = os.listdir(train_dir)
-        train_paths = [os.path.join(train_dir, train_name)
-                       for train_name in train_names]
-        self.filepaths = train_paths
-        # Get validation filenames
+    def __init__(self, root, cls, transform=None, include_val=False):
+        # Initialize base class
+        train_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/train/" + cls)
+        super(ImageNetDataset, self).__init__(
+            root=train_dir, transform=transform)
+
+        # Get validation file names
         if include_val:
             val_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/val")
             val_df = pd.read_csv(os.path.join(root, "LOC_val_solution.csv"))
@@ -71,16 +52,3 @@ class ImageNetDataset(torch.utils.data.Dataset):
             val_paths = [os.path.join(val_dir, val_name + ".JPEG")
                          for val_name in val_names]
             self.filepaths.extend(val_paths)
-        # Get transformation function
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.filepaths)
-
-    def __getitem__(self, idx):
-        return self.transform(default_loader(self.filepaths[idx]))
-
-    @property
-    def data(self):
-        """Return list of loaded images"""
-        return list(map(self.__getitem__, range(self.__len__())))

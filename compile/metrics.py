@@ -6,7 +6,7 @@ and return the computed metric.
 import numpy as np
 import torch
 
-from base.base_metric import FPMetric, FEMetric
+from base import FPMetric, FEMetric
 
 from .metrics_utils import calculate_kid, calculate_fid
 
