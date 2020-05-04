@@ -52,3 +52,26 @@ class ImageNetDataset(BaseDataset):
             val_paths = [os.path.join(val_dir, val_name + ".JPEG")
                          for val_name in val_names]
             self.filepaths.extend(val_paths)
+
+
+class CelebADataset(BaseDataset):
+    """CelebA dataset reader.
+
+    Parameters
+    ----------
+    root : str
+        Root directory of the CelebA dataset, with the following tree
+        structure:
+            root
+                ├── images [202599 entries]
+                └── list_attr_celeba.txt
+    transform : fn
+        A function in `pre_processing.py` to be taken as the custom image
+        transformation function.
+
+    """
+    def __init__(self, root, transform):
+        # Initialize base class
+        train_dir = os.path.join(root, "images")
+        super(CelebADataset, self).__init__(
+            root=train_dir, transform=transform)

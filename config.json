@@ -80,15 +80,13 @@
 
             "data_loader": {
                 "type": "data_loader",
-                "name": "ImageNetLoader",
+                "name": "CelebALoader",
                 "args":{
                     "dataset": {
                         "type": "dataset",
-                        "name": "ImageNetDataset",
+                        "name": "CelebADataset",
                         "args": {
-                            "root": "/media/jupyter/Data/dataset/ImageNet/ImageNet",
-                            "cls": "n01514668",
-                            "include_val": true,
+                            "root": "/media/jupyter/Data/dataset/celeba",
                             "transform": {
                                 "type": "pre_processing",
                                 "name": "DCGAN_transform",
