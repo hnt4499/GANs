@@ -207,7 +207,6 @@ class InceptionV3(BaseFeatureExtractorModule):
         # Further transform input
         if self.transform_input:
             x = self._transform_input(x)
-        print(x.shape, x.min(), x.max(), x.mean())
         # Feed-forward
         output = self._forward(x)
 
