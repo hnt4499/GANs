@@ -41,8 +41,6 @@ class ImageNetDataset(torch.utils.data.Dataset):
     cls : str
         A ImageNet class name, for example "n01531178", which corresponds to
         "goldfinch".
-    image_size : int
-        Input images will be center-cropped and resized to this `image_size`.
     transform : str
         A function in `pre_processing.py` to be taken as the custom image
         transformation function.
@@ -50,7 +48,7 @@ class ImageNetDataset(torch.utils.data.Dataset):
         Whether to include images from validation set.
 
     """
-    def __init__(self, root, cls, image_size, transform, include_val=False):
+    def __init__(self, root, cls, transform, include_val=False):
         super(ImageNetDataset).__init__()
         # Get train filepaths
         train_dir = os.path.join(root, "ILSVRC/Data/CLS-LOC/train")

@@ -88,7 +88,6 @@
                         "args": {
                             "root": "/media/jupyter/Data/dataset/ImageNet/ImageNet",
                             "cls": "n01514668",
-                            "image_size": 64,
                             "include_val": true,
                             "transform": {
                                 "type": "pre_processing",
