@@ -54,6 +54,31 @@ class BaseDataset(torch.utils.data.Dataset):
             self._data = list(map(self.__getitem__, range(self.__len__())))
         return self._data
 
+    def sample(self, num_samples, random=False):
+        """Sample a subset from the dataset.
+
+        Parameters
+        ----------
+        num_samples : int
+            Number of samples of the subset.
+        random : bool
+            If True, sample the dataset randomly.
+            Otherwise, return the subset of `num_samples` first images of the
+            dataset.
+
+        """
+        if num_samples > self.__len__():
+            raise ValueError(
+                "Number of samples ({}) exceeds the total number of "
+                "images ({}).".format(num_samples, self.__len__()))
+        if random:
+            idxs = np.random.choice(
+                np.arange(self.__len__()), num_samples, replace=False)
+        else:
+            idxs = np.arange(num_samples)
+        fn = lambda idx: self[idx]
+        return list(map(fn, idxs))
+
 
 """
 Helper functions for data loading
