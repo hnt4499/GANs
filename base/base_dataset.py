@@ -1,6 +1,7 @@
 import os
 
 from PIL import Image
+import numpy as np
 import torch
 from torchvision import get_image_backend
 
