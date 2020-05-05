@@ -173,7 +173,7 @@ class ConfigParser:
         # Save mapping for future use
         self.type_mapping = type_mapping
         # Initialize all objects in-place
-        _init_all_helper(self.config, self.type_mapping)
+        init_all_helper(self.config, self.type_mapping)
 
     def prune(self):
         """Recursively remove all instantiated objects from a configuration
@@ -290,8 +290,8 @@ def _get_initialized_object(config, path, type_mapping):
     return fn(**kwargs)
 
 
-def _init_all_helper(config, type_mapping, level=0, path="root",
-                     is_arg=False):
+def init_all_helper(config, type_mapping, level=0, path="root",
+                    is_arg=False):
     """Recursion helper function for `ConfigParser.init_all`.
 
     Parameters
@@ -320,7 +320,7 @@ def _init_all_helper(config, type_mapping, level=0, path="root",
                 + path)
         # Initialize children objects
         for key in keys:
-            _init_all_helper(
+            init_all_helper(
                 config[key], type_mapping, level + 1, path, is_arg=True)
 
         # Ignore current object if `ignored` is set to True
@@ -340,7 +340,7 @@ def _init_all_helper(config, type_mapping, level=0, path="root",
         # Initialize objects
         for key in keys:
             child_path = path + "->" + key
-            _init_all_helper(
+            init_all_helper(
                 config[key], type_mapping, level + 1, child_path, is_arg=False)
         # Post-handle multiple objects for compatibility
         if "0" in keys:
