@@ -1,8 +1,59 @@
 import os
 
+import numpy as np
 import pandas as pd
+import torch
 
 from base import BaseDataset
+
+
+class DummyDataset(torch.utils.data.Dataset):
+    """Dummy dataset for testing purposes.
+
+    Parameters
+    ----------
+    num_samples : int
+        Number of samples. Data will be a list of integers from 0 to
+        `num_samples - 1`.
+
+    """
+    def __init__(self, num_samples):
+        self.num_samples = num_samples
+        self._data = list(range(num_samples))
+
+    def __len__(self):
+        return self.num_samples
+
+    def __getitem__(self, idx):
+        return idx
+
+    @property
+    def data(self):
+        return self._data
+
+    def sample(self, num_samples, random=False):
+        """Sample a subset from the dataset.
+
+        Parameters
+        ----------
+        num_samples : int
+            Number of samples of the subset.
+        shuffle : bool
+            If True, sample the dataset randomly.
+            Otherwise, return the subset of `num_samples` first entries of the
+            dataset.
+
+        """
+        if num_samples > self.__len__():
+            raise ValueError(
+                "Number of samples ({}) exceeds the total number of "
+                "images ({}).".format(num_samples, self.__len__()))
+        if random:
+            subset = np.random.choice(
+                self.data, num_samples, replace=False).tolist()
+        else:
+            subset = list(range(num_samples))
+        return subset
 
 
 class ImageNetDataset(BaseDataset):
