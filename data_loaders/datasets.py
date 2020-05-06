@@ -41,6 +41,7 @@ class DummyDataset(torch.utils.data.Dataset):
         else:
             self._data = np.full(
                 shape=data_shape, fill_value=fill, dtype=dtype)
+        self._data = torch.from_numpy(self._data)
 
     def __len__(self):
         return self.num_samples
