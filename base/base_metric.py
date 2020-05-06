@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 
+from utils import forward_batch
+
 
 class BaseMetric:
     """Base class for any metric implementation. Subclass must implement
@@ -93,24 +95,26 @@ class FEMetric(FPMetric):
         if self.max_samples is None:
             if not hasattr(self, "real_samples"):
                 self.real_samples = self.trainer.data_loader.dataset.data
-                self.real_samples = torch.stack(self.real_samples)
                 self.num_samples = len(self.real_samples)
         # Get a random subset if `max_samples` is specified
         # Re-sample every time this function gets called
         else:
             self.real_samples = self.trainer.data_loader.dataset.sample(
                 num_samples=self.max_samples, random=True)
-            self.real_samples = torch.stack(self.real_samples)
             self.num_samples = self.max_samples
+        if isinstance(self.real_samples, list):
+            self.real_samples = torch.stack(self.real_samples)
         return self.real_samples
 
     def _get_fake_samples(self):
         """Helper function to get fake samples without shuffling"""
         # Generate random noise then fake samples
         self.noise = torch.randn(
-            self.num_samples, self.trainer.length_z, 1, 1,
-            device=self.trainer.device)
-        self.fake_samples = self.trainer.netG(self.noise).detach().cpu()
+            self.num_samples, self.trainer.length_z, 1, 1)
+        self.fake_samples = forward_batch(
+            model=self.trainer.netG, inputs=self.noise,
+            device=self.trainer.device,
+            batch_size=self.trainer.data_loader.batch_size)
         return self.fake_samples
 
     def _get_features(self, real_samples, fake_samples):

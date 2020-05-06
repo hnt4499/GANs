@@ -1,9 +1,11 @@
+import math
 import json
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
 
 import pandas as pd
+import torch
 
 
 def ensure_dir(dirname):
@@ -28,6 +30,23 @@ def inf_loop(data_loader):
     """Wrapper function for endless data loader."""
     for loader in repeat(data_loader):
         yield from loader
+
+
+def forward_batch(model, inputs, device, batch_size=128):
+    """Forward data in batches and return the stacked results as a torch
+    tensor on CPU"""
+    num_samples = len(inputs)
+    num_batches = math.ceil(num_samples / batch_size)
+    outputs = list()
+
+    for batch in range(num_batches):
+        start = batch * batch_size
+        end = start + batch_size
+
+        output = model(inputs[start:end].to(device=device))
+        outputs.append(output.cpu())
+
+    return torch.cat(outputs, dim=0)
 
 
 class Cache:

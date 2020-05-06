@@ -165,10 +165,11 @@ class BaseGANTrainer(BaseTrainer):
             # Update generator
             self.netG.optimizer.step()
 
-            # Cache data for future use
+            # Cache data for future use; and send all data to cpu
             with torch.no_grad():
                 generated_from_fixed_noise = self.netG(
-                    self.fixed_noise).detach()
+                    self.fixed_noise).detach().cpu()
+                generated_from_random_noise = generated_from_random_noise.cpu()
             self.current_batch.cache(
                 batch_idx=batch_idx,
                 batch_size=batch_size,
@@ -221,7 +222,7 @@ class BaseGANTrainer(BaseTrainer):
         if self.epoch % self.save_images_every == 0:
             self.writer.add_image(
                 "fixed_noise",
-                make_grid(self.current_batch.generated_from_fixed_noise.cpu(),
+                make_grid(self.current_batch.generated_from_fixed_noise,
                           nrow=8, normalize=True))
         # Early stopping
         if self.callbacks is not None:
