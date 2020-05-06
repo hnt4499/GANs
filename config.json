@@ -71,7 +71,7 @@
                             "args": {"output_layer": "Mixed_6e", "resize_to": null, "normalize_input": true, "transform_input": true,
                                      "batch_size": 128, "device": "cuda", "prune": true, "traverse_level": 1}
                         },
-                        "name": "kid", "max_samples": null, "kid_batch_size": 512, "dp": 4
+                        "name": "kid", "max_samples": 10000, "kid_batch_size": 512, "dp": 4
                     }
                 },
                 "comment": "This protocol is used to handle arguments as a list of objects.",
@@ -81,21 +81,14 @@
             "data_loader": {
                 "type": "data_loader",
                 "name": "CelebALoader",
-                "args":{
+                "args": {
                     "dataset": {
                         "type": "dataset",
-                        "name": "CelebADataset",
-                        "args": {
-                            "root": "/media/jupyter/Data/dataset/celeba",
-                            "transform": {
-                                "type": "pre_processing",
-                                "name": "DCGAN_transform",
-                                "args": {"image_size": 64, "mean": 0.5, "std": 0.5}
-                            }
-                        }
+                        "name": "CelebADatasetNpy",
+                        "args": {"info_path": "/media/jupyter/Data/dataset/celeba/info.json", "transform": null}
                     },
                     "batch_size": 128,
-                    "num_workers": 4,
+                    "num_workers": 0,
                     "shuffle": true
                 }
             },

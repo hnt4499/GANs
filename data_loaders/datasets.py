@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from base import BaseDataset
+from base import BaseDataset, BaseDatasetNpy
 
 
 class DummyDataset(torch.utils.data.Dataset):
@@ -147,3 +147,7 @@ class CelebADataset(BaseDataset):
         train_dir = os.path.join(root, "images")
         super(CelebADataset, self).__init__(
             root=train_dir, transform=transform)
+
+
+class CelebADatasetNpy(BaseDatasetNpy):
+    """CelebA dataset reader from *npy file(s)."""
