@@ -13,19 +13,40 @@ class DummyDataset(torch.utils.data.Dataset):
     Parameters
     ----------
     num_samples : int
-        Number of samples. Data will be a list of integers from 0 to
-        `num_samples - 1`.
-
+        Number of samples.
+    fill : int or float or None
+        If None, fill the dataset sequentially (i.e., as in `range`).
+        If not None, fill the dataset with this value.
+    shape : list of integers
+        Sample's shape. For example, if None, each sample is a scalar.
+    dtype
+        Must be a valid numpy data type.
     """
-    def __init__(self, num_samples):
+    def __init__(self, num_samples, fill=None, shape=None, dtype="int"):
+        # Cache data
         self.num_samples = num_samples
-        self._data = list(range(num_samples))
+        self.fill = fill
+        self.shape = shape
+        self.dtype = dtype
+
+        # Dataset shape
+        data_shape = [num_samples]
+        if shape is not None:
+            data_shape += list(shape)
+        # Create dummy dataset
+        if fill is None:
+            num_entries = np.prod(data_shape)
+            self._data = np.arange(
+                num_entries, dtype=dtype).reshape(data_shape)
+        else:
+            self._data = np.full(
+                shape=data_shape, fill_value=fill, dtype=dtype)
 
     def __len__(self):
         return self.num_samples
 
     def __getitem__(self, idx):
-        return idx
+        return self._data[idx]
 
     @property
     def data(self):
@@ -49,11 +70,11 @@ class DummyDataset(torch.utils.data.Dataset):
                 "Number of samples ({}) exceeds the total number of "
                 "images ({}).".format(num_samples, self.__len__()))
         if random:
-            subset = np.random.choice(
-                self.data, num_samples, replace=False).tolist()
+            idxs = np.random.choice(
+                range(self.num_samples), num_samples, replace=False)
         else:
-            subset = list(range(num_samples))
-        return subset
+            idxs = list(range(num_samples))
+        return self._data[idxs]
 
 
 class ImageNetDataset(BaseDataset):
