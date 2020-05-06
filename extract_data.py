@@ -1,13 +1,15 @@
 import os
+import re
 import sys
 import math
 import argparse
-import json
+from collections import OrderedDict
 
 import numpy as np
 
 from data_loaders import data_loaders, datasets, pre_processing
 from parse_config import init_all_helper
+from utils import read_json, write_json
 
 
 def get_save_path(save_path, idx):
@@ -19,6 +21,18 @@ def get_save_path(save_path, idx):
     return filename
 
 
+def save_part(images, info, out_path, part_idx=0, verbose=True):
+    # Save
+    save_path = get_save_path(out_path, idx=part_idx)
+    np.save(save_path, images)
+    # Cache useful information
+    info["parts"][part_idx] = OrderedDict(
+        save_path=save_path, shape=list(images.shape))
+    if verbose:
+        print("Successfully saved part {} consisting of {} images "
+              "to {}.".format(part_idx, len(images), save_path))
+
+
 def extract_data(data_loader, out_path, auto_split=True, num_parts=1,
                  max_mem_fraction=None, verbose=True):
     if verbose:
@@ -28,6 +42,7 @@ def extract_data(data_loader, out_path, auto_split=True, num_parts=1,
         tqdm = log = lambda x: x  # dummy identity function
     # Parameters
     images = list()
+    info = OrderedDict()  # store information such as len, dtype, ...
     batch_size = data_loader.batch_size
     num_batches = len(data_loader)
     num_batches_in_a_part = None if auto_split else num_batches
@@ -54,16 +69,19 @@ def extract_data(data_loader, out_path, auto_split=True, num_parts=1,
                       " of {} batches ({} images)".format(
                         num_parts, num_batches_in_a_part,
                         num_batches_in_a_part * batch_size))
+        # Cache useful information
+        if "dtype" not in info:
+            info["dtype"] = str(batch.dtype)
+            info["num_parts"] = num_parts
+            info["num_images"] = len(data_loader.dataset)
+            info["parts"] = OrderedDict()
         # Start of a new part
         if batch_idx % num_batches_in_a_part == 0:
             # Save previous part
             if batch_idx != 0:
                 part_idx = batch_idx // num_batches_in_a_part - 1
-                save_path = get_save_path(out_path, idx=part_idx)
-                np.save(save_path, images)
-                if verbose:
-                    print("Successfully saved part {} consisting of {} images "
-                          "to {}.".format(part_idx, len(images), save_path))
+                save_part(images, info, out_path=out_path, part_idx=part_idx,
+                          verbose=verbose)
             # Allocate empty array for this part
             del images
             images = np.empty(
@@ -76,11 +94,12 @@ def extract_data(data_loader, out_path, auto_split=True, num_parts=1,
     # For the last part
     images = images[:end]
     part_idx += 1
-    save_path = get_save_path(out_path, idx=part_idx)
-    np.save(save_path, images)
-    if verbose:
-        print("Successfully saved part {} consisting of {} images to "
-              "{}.".format(part_idx, len(images), save_path))
+    save_part(
+        images, info, out_path=out_path, part_idx=part_idx, verbose=verbose)
+    # Save `info` to a json file
+    curr_dir = os.path.split(out_path)[0]
+    info_path = os.path.join(curr_dir, "info.json")
+    write_json(info, info_path)
 
 
 def main(args):
@@ -89,8 +108,7 @@ def main(args):
         raise ValueError('One of flags ["num_parts", "max_mem_fraction"] must '
                          'be set when "auto_split" is set to True.')
     # Read json
-    with open(args.config, "rt") as fin:
-        config = json.load(fin)
+    config = read_json(args.config)
     # Initialize dataset
     type_mapping = {
         "data_loader": data_loaders,
