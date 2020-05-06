@@ -1,6 +1,7 @@
 from abc import abstractmethod
 
 import torch
+from torchvision.utils import make_grid
 from numpy import inf
 
 from logger import TensorboardWriter
@@ -45,7 +46,7 @@ class BaseTrainer:
         if "resume" in config and config.resume is not None:
             self._resume_checkpoint(config.resume)
         else:
-            self.start_epoch = 1
+            self.start_epoch = 0
 
     def _get_device(self, n_gpu_use):
         """
@@ -65,30 +66,39 @@ class BaseTrainer:
         list_ids = list(range(n_gpu_use))
         return device, list_ids
 
-    def _save_checkpoint(self):
-        """
-        Save current model state to a checkpoint.
-        """
-        if self.epoch % self.save_ckpt_every == 0:
-            state = {
-                "epoch": self.epoch,
-                "config": self.config.prune(),
+    def _save_checkpoint(self, filename=None, **custom_info):
+        """Save current model state to a checkpoint.
 
-                "netD_name": type(self.netD).__name__,
-                "netG_name": type(self.netG).__name__,
-                "netD_state_dict": self.netD.state_dict(),
-                "netG_state_dict": self.netG.state_dict(),
+        Parameters
+        ----------
+        filename : str
+            Saved file name. If None, use default filename format.
+        **custom_info
+            Custom information to add to the state dictionary.
 
-                "optimD_name": type(self.netD.optimizer).__name__,
-                "optimG_name": type(self.netG.optimizer).__name__,
-                "optimD_state_dict": self.netD.optimizer.state_dict(),
-                "optimG_state_dict": self.netG.optimizer.state_dict(),
-            }
-            filename = str(
-                self.checkpoint_dir / "checkpoint-epoch{}.pth".format(
-                    self.epoch))
-            torch.save(state, filename)
-            self.logger.info("Saving checkpoint: {} ...".format(filename))
+        """
+        # State dictionary
+        state = {
+            "epoch": self.epoch,
+            "config": self.config.prune(),
+
+            "netD_name": type(self.netD).__name__,
+            "netG_name": type(self.netG).__name__,
+            "netD_state_dict": self.netD.state_dict(),
+            "netG_state_dict": self.netG.state_dict(),
+
+            "optimD_name": type(self.netD.optimizer).__name__,
+            "optimG_name": type(self.netG.optimizer).__name__,
+            "optimD_state_dict": self.netD.optimizer.state_dict(),
+            "optimG_state_dict": self.netG.optimizer.state_dict(),
+        }
+        state.update(custom_info)
+
+        if filename is None:
+            filename = "checkpoint-epoch{}.pth".format(self.epoch)
+        filepath = self.checkpoint_dir / filename
+        torch.save(state, filepath)
+        self.logger.info("Saving checkpoint: {} ...".format(filepath))
 
     def _resume_checkpoint(self, resume_path):
         """Resume from saved checkpoints.
@@ -133,6 +143,21 @@ class BaseTrainer:
         self.logger.info("Checkpoint loaded. Resume training from "
                          "epoch {}".format(self.start_epoch))
 
+    def _write_images_to_tensorboard(self, images, name, **kwargs):
+        """Write images to tensorboard writer.
+
+        Parameters
+        ----------
+        name : str
+            Name to be displayed in tensorboard.
+        images : torch.Tensor
+            Images to write.
+        **kwargs
+            Keyword arguments to pass to `make_grid` function.
+
+        """
+        self.writer.add_image(name, make_grid(images, **kwargs))
+
     @abstractmethod
     def _train_epoch(self):
         """Training logic for an epoch.
@@ -151,7 +176,7 @@ class BaseTrainer:
     @abstractmethod
     def on_epoch_start(self):
         """
-        Function to be called at the beginning of every epochs. Note that this
+        Function to be called at the beginning of every epoch. Note that this
         function takes no arguments.
         """
         raise NotImplementedError
@@ -159,7 +184,23 @@ class BaseTrainer:
     @abstractmethod
     def on_epoch_end(self):
         """
-        Function to be called at the end of every epochs. Note that this
+        Function to be called at the end of every epoch. Note that this
+        function takes no arguments.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def on_batch_start(self):
+        """
+        Function to be called at the beginning of every batch. Note that this
+        function takes no arguments.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def on_batch_end(self):
+        """
+        Function to be called at the end of every batch. Note that this
         function takes no arguments.
         """
         raise NotImplementedError
@@ -168,18 +209,12 @@ class BaseTrainer:
         """
         Full training logic
         """
-        for epoch in range(self.start_epoch, self.epochs + 1):
+        for epoch in range(self.start_epoch, self.epochs):
             self.epoch = epoch
             # Epoch start
             self.on_epoch_start()
             # Start training
-            result = self._train_epoch()
-            # Save logged informations into log dict
-            log = {"epoch": epoch}
-            log.update(result)
-            # Print logged informations to the screen
-            for key, value in log.items():
-                self.logger.info("    {:15s}: {}".format(str(key), value))
+            self._train_epoch()
             # Epoch end
             self.on_epoch_end()
             if self.stop:

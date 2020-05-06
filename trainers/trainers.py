@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 import torch
-from torchvision.utils import make_grid
 
 from base import BaseTrainer
 from utils import inf_loop, Cache, CustomMetrics, MetricTracker
@@ -82,6 +81,7 @@ class BaseGANTrainer(BaseTrainer):
             *self.custom_metrics.metric_names, writer=self.writer)
         # For storing current training information
         self.current_batch = Cache()
+        self.global_step = 0
 
     def _train_epoch(self):
         """Training logic for an epoch.
@@ -101,6 +101,8 @@ class BaseGANTrainer(BaseTrainer):
         self.tracker.reset()
 
         for batch_idx, real_data in enumerate(self.data_loader):
+            # Batch start
+            self.on_batch_start()
             """
             DISCRIMINATOR
             Update discriminator network with all-real batch. Maximize
@@ -168,65 +170,111 @@ class BaseGANTrainer(BaseTrainer):
             # Cache data for future use; and send all data to cpu
             with torch.no_grad():
                 generated_from_fixed_noise = self.netG(
-                    self.fixed_noise).detach().cpu()
-                generated_from_random_noise = generated_from_random_noise.cpu()
+                    self.fixed_noise).detach()
             self.current_batch.cache(
                 batch_idx=batch_idx,
                 batch_size=batch_size,
-                real_samples=real_data,
-                fixed_noise=self.fixed_noise,
-                generated_from_fixed_noise=generated_from_fixed_noise,
-                random_noise=noise,
-                generated_from_random_noise=generated_from_random_noise,
-                output_D=output_D,  # discriminator output for generated images
+                global_step=self.epoch * self.len_epoch + batch_idx,
+
+                real_samples=real_data.cpu(),
+                fixed_noise=self.fixed_noise.cpu(),
+                generated_from_fixed_noise=generated_from_fixed_noise.cpu(),
+                random_noise=noise.cpu(),
+                generated_from_random_noise=generated_from_random_noise.cpu(),
+                output_D=output_D.cpu(),  # disc. output for generated images
+
+                loss_D=loss_D.item(),
+                loss_G=loss_G.item(),
+                D_x=D_x,
+                D_G_z1=D_G_z1,
+                D_G_z2=D_G_z2,
             )
 
-            # Update logger
-            self.writer.set_step((self.epoch - 1) * self.len_epoch + batch_idx)
-            # For discriminator
-            self.tracker.update("loss_D", loss_D.item())
-            self.tracker.update("D_x", D_x)
-            self.tracker.update("D_G_z1", D_G_z1)
-            self.tracker.update("D_G_z2", D_G_z2)
-            # Compute custom metrics and update to tracker
-            custom_metrics = self.custom_metrics.compute()
-            for met_name, met in custom_metrics.items():
-                self.tracker.update(met_name, met)
-            # For generator, don't allow any metrics other than loss
-            self.tracker.update("loss_G", loss_G.item())
-            # Print info
-            if batch_idx % self.write_logs_every == 0:
-                # Default info
-                to_print = "{}{}\tLoss_D: {:.6f}\tLoss_G: {:.6f}\tD(x): " \
-                    "{:.4f}\tD(G(z)): {:.4f}/{:.4f}".format(
-                        self._progress_epoch(self.epoch),
-                        self._progress_batch(batch_idx), loss_D.item(),
-                        loss_G.item(), D_x, D_G_z1, D_G_z2)
-                # Add custom metrics
-                for met in self.custom_metrics.metrics:
-                    to_print += "\t{}".format(str(met))
-                self.logger.debug(to_print)
+            # Batch end
+            self.on_batch_end()
+            # Early stopping
+            if self.stop:
+                break
 
         return self.tracker.result()
+
+    def current(self, key):
+        """Helper function to get current batch information"""
+        return getattr(self.current_batch, key)
 
     def on_epoch_start(self):
         """Do nothing on epoch start."""
         return
 
     def on_epoch_end(self):
+        """Do nothing on epoch end."""
+        return
+
+    def on_batch_start(self):
+        """Do nothing on batch start."""
+        return
+
+    def on_batch_end(self):
         """Save images generated from fixed noise inputs as well as model
-        checkpoints on epoch end."""
+        checkpoints on batch end."""
+        # Update writer and tracker
+        self._update_writer()
+        self._update_tracker()
+        # Write log
+        if self.current("global_step") % self.write_logs_every == 0 \
+                and self.current("global_step") != 0:
+            self._write_log()
         # Save model state to a checkpoint
-        self._save_checkpoint()
+        if self.current("global_step") % self.save_ckpt_every == 0 \
+                and self.current("global_step") != 0:
+            filename = "checkpoint-step{}.pth".format(
+                self.current("global_step"))
+            self._save_checkpoint(
+                filename, batch_idx=self.current("batch_idx"),
+                global_step=self.current("global_step"))
         # Cache fake images on fixed noise input
-        if self.epoch % self.save_images_every == 0:
-            self.writer.add_image(
-                "fixed_noise",
-                make_grid(self.current_batch.generated_from_fixed_noise,
-                          nrow=8, normalize=True))
+        if self.current("global_step") % self.save_images_every == 0 \
+                and self.current("global_step") != 0:
+            self._write_images_to_tensorboard(
+                images=self.current("generated_from_fixed_noise"),
+                name="fixed_noise", nrow=8, normalize=True)
         # Early stopping
         if self.callbacks is not None:
             self.stop = self.callbacks(self)
+
+    def _update_writer(self):
+        """Update tensorboard writer"""
+        self.writer.set_step(self.current("global_step"))
+
+    def _update_tracker(self):
+        """Update tracker"""
+        # For discriminator
+        self.tracker.update("loss_D", self.current("loss_D"))
+        self.tracker.update("D_x", self.current("D_x"))
+        self.tracker.update("D_G_z1", self.current("D_G_z1"))
+        self.tracker.update("D_G_z2", self.current("D_G_z2"))
+        # For generator, don't allow any metrics other than loss
+        self.tracker.update("loss_G", self.current("loss_G"))
+        # Compute custom metrics and update to tracker
+        custom_metrics = self.custom_metrics.compute()
+        for met_name, met in custom_metrics.items():
+            self.tracker.update(met_name, met)
+
+    def _write_log(self):
+        """Helper function to write logs every `self.write_logs_every`
+        batches."""
+        # Default info
+        to_print = "{}{}\tLoss_D: {:.6f}\tLoss_G: {:.6f}\tD(x): " \
+            "{:.4f}\tD(G(z)): {:.4f}/{:.4f}".format(
+                self._progress_epoch(self.epoch),
+                self._progress_batch(self.current("batch_idx")),
+                self.current("loss_D"), self.current("loss_G"),
+                self.current("D_x"), self.current("D_G_z1"),
+                self.current("D_G_z2"))
+        # Add custom metrics info
+        for met in self.custom_metrics.metrics:
+            to_print += "\t{}".format(str(met))
+        self.logger.info(to_print)
 
     def _get_progess(self, current, total):
         n = len(str(total))
@@ -236,7 +284,7 @@ class BaseGANTrainer(BaseTrainer):
 
     def _progress_epoch(self, epoch_idx):
         current = epoch_idx
-        total = self.epochs
+        total = self.epochs - 1
         return self._get_progess(current, total)
 
     def _progress_batch(self, batch_idx):

@@ -93,17 +93,13 @@
                 }
             },
 
-            "callbacks": {
-                "type": "callbacks",
-                "name": "Thresholding",
-                "args": {"monitor": "D_G_z2", "mode": "max", "threshold": 0.001, "min_delta": 0, "patience": 15, "verbose": 1}
-            }
+            "callbacks": null
         },
 
-        "epochs": 1000,
+        "epochs": 100,
 
         "save_dir": "/media/jupyter/Data/train/DCGAN",
-        "save_ckpt_every": 25,
+        "save_ckpt_every": 100,
         "num_ckpt_to_keep": 5,
         "save_images_every": 5,
         "write_logs_every": 1,
