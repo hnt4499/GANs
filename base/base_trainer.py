@@ -1,3 +1,5 @@
+import os
+from queue import Queue
 from abc import abstractmethod
 
 import torch
@@ -28,6 +30,7 @@ class BaseTrainer:
                 self.netD, device_ids=self.device_ids)
             self.netG = torch.nn.DataParallel(
                 self.netG, device_ids=self.device_ids)
+
         # Training configuration
         cfg_trainer = config["trainer"]
         self.epochs = cfg_trainer["epochs"]
@@ -36,6 +39,13 @@ class BaseTrainer:
         # Directory to save models and logs
         self.checkpoint_dir = config.checkpoint_dir
         self.log_dir = config.log_dir
+        # Maximum number of checkpoints to keep
+        if "num_ckpt_to_keep" in cfg_trainer:
+            self.num_ckpt_to_keep = cfg_trainer["num_ckpt_to_keep"]
+        else:
+            self.num_ckpt_to_keep = None  # keep all
+        self.saved_checkpoints = Queue(maxsize=0)  # checkpoint paths
+
         # Get logger
         self.logger = config.get_logger(
             "trainer", verbosity=config["trainer"]["verbosity"])
@@ -98,12 +108,20 @@ class BaseTrainer:
             "optimG_state_dict": self.netG.optimizer.state_dict(),
         }
         state.update(custom_info)
-
+        # Save checkpoint
         if filename is None:
             filename = "checkpoint-epoch{}.pth".format(self.epoch)
         filepath = self.checkpoint_dir / filename
         torch.save(state, filepath)
+        self.saved_checkpoints.put(filepath)
         self.logger.info("Saving checkpoint: {} ...".format(filepath))
+        # Remove old checkpoint
+        if self.num_ckpt_to_keep is not None and \
+                self.saved_checkpoints.qsize() > self.num_ckpt_to_keep:
+            old_ckpt = self.saved_checkpoints.get()
+            os.remove(old_ckpt)
+            # Make sure it works as expected
+            assert self.saved_checkpoints.qsize() == self.num_ckpt_to_keep
 
     def _resume_checkpoint(self, resume_path):
         """Resume from saved checkpoints.
