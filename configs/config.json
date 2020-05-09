@@ -96,16 +96,16 @@
             "callbacks": null,
 
             "train_options": {
-                "smooth_label": null,
+                "smooth_label": 0.75,
                 "epochs": 100,
                 "save_dir": "/media/jupyter/Data/train/DCGAN",
                 "save_ckpt_every": 100,
                 "num_ckpt_to_keep": 5,
-                "save_images_every": 5,
-                "write_logs_every": 1,
+                "save_images_every": 100,
+                "write_logs_every": 5,
                 "verbosity": 2,
                 "tensorboard": true
             }
-        },
+        }
     }
 }

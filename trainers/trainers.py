@@ -62,6 +62,10 @@ class BaseGANTrainer(BaseTrainer):
         # Labels convention
         self.real_label = 1
         self.fake_label = 0
+        # One-sided label smoothing for discriminator
+        self.smooth_label = self.train_options["smooth_label"]
+        if self.smooth_label is None:
+            self.smooth_label = 1
         # Fixed noise input for visual validation
         self.length_z = self.netG.input_length
         self.fixed_noise = torch.randn(
@@ -109,11 +113,11 @@ class BaseGANTrainer(BaseTrainer):
             real_data = real_data.to(self.device)
             batch_size = real_data.size(0)
             labels_D = torch.full(
-                (batch_size,), self.real_label, device=self.device)
+                (batch_size,), self.smooth_label, device=self.device)
             # Forward pass real batch through discriminator
             output_D = self.netD(real_data).view(-1)
             # Calculate loss on all-real batch
-            loss_D_real = self.netD.criterion(output_D, labels_D)
+            loss_D_real = self.netD.criterion(output_D, None, labels_D)
             # Calculate gradients for discriminator in backward pass
             loss_D_real.backward()
             # Accuracy of discriminator on all-real batch
@@ -133,7 +137,7 @@ class BaseGANTrainer(BaseTrainer):
             # Classify all-fake batch with discriminator
             output_D = self.netD(generated_from_random_noise.detach()).view(-1)
             # Calculate discriminator's loss on the all-fake batch
-            loss_D_fake = self.netD.criterion(output_D, labels_D)
+            loss_D_fake = self.netD.criterion(output_D, None, labels_D)
             # Calculate the gradients for this batch
             loss_D_fake.backward()
             # (1 - accuracy) of discriminator on all-fake data before updating
@@ -155,7 +159,7 @@ class BaseGANTrainer(BaseTrainer):
             # of all-fake batch through discriminator
             output_D = self.netD(generated_from_random_noise).view(-1)
             # Calculate generator's loss based on this output
-            loss_G = self.netG.criterion(output_D, labels_G)
+            loss_G = self.netG.criterion(output_D, None, labels_G)
             # Calculate gradients for generator
             loss_G.backward()
             # (1 - accuracy) of discriminator on all-fake data after updating
