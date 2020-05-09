@@ -10,6 +10,8 @@ def setup_logging(save_dir, log_config="logger/logger_config.json",
     """
     Setup logging configuration
     """
+    if save_dir is None:
+        save_dir = Path("/tmp")  # make it temporary
     log_config = Path(log_config)
     if log_config.is_file():
         config = read_json(log_config)

@@ -40,8 +40,11 @@ class BaseTrainer:
         self.logger = config.get_logger(
             "trainer", verbosity=config["trainer"]["verbosity"])
         # Setup visualization writer instance
-        self.writer = TensorboardWriter(
-            self.log_dir, self.logger, enabled=cfg_trainer["tensorboard"])
+        if self.log_dir is None:
+            self.writer = None
+        else:
+            self.writer = TensorboardWriter(
+                self.log_dir, self.logger, enabled=cfg_trainer["tensorboard"])
         # Resume checkpoint if specified
         if "resume" in config and config.resume is not None:
             self._resume_checkpoint(config.resume)
@@ -77,6 +80,8 @@ class BaseTrainer:
             Custom information to add to the state dictionary.
 
         """
+        if self.checkpoint_dir is None:
+            return
         # State dictionary
         state = {
             "epoch": self.epoch,
@@ -156,7 +161,8 @@ class BaseTrainer:
             Keyword arguments to pass to `make_grid` function.
 
         """
-        self.writer.add_image(name, make_grid(images, **kwargs))
+        if self.writer is not None:
+            self.writer.add_image(name, make_grid(images, **kwargs))
 
     @abstractmethod
     def _train_epoch(self):

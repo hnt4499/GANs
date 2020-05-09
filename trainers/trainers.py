@@ -244,7 +244,8 @@ class BaseGANTrainer(BaseTrainer):
 
     def _update_writer(self):
         """Update tensorboard writer"""
-        self.writer.set_step(self.current("global_step"))
+        if self.writer is not None:
+            self.writer.set_step(self.current("global_step"))
 
     def _update_tracker(self):
         """Update tracker"""

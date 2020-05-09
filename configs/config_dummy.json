@@ -82,7 +82,7 @@
 
         "epochs": 100,
 
-        "save_dir": "/media/jupyter/Data/train/DCGAN",
+        "save_dir": null,
         "save_ckpt_every": 100,
         "num_ckpt_to_keep": 5,
         "save_images_every": 5,
