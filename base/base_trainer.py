@@ -7,6 +7,7 @@ from torchvision.utils import make_grid
 from numpy import inf
 
 from logger import TensorboardWriter
+from utils import DefaultDict
 
 
 class BaseTrainer:
@@ -14,11 +15,12 @@ class BaseTrainer:
     Base class for all trainers, taking care of basic parameters and
     configurations.
     """
-    def __init__(self, netD, netG, config):
+    def __init__(self, netD, netG, train_options, config):
 
         # Cache data
         self.netD = netD
         self.netG = netG
+        self.train_options = DefaultDict(default_value=None, **train_options)
         self.config = config
         self.stop = False  # use for early stopping
         # Setup GPU device if available and move model into configured device
@@ -32,29 +34,26 @@ class BaseTrainer:
                 self.netG, device_ids=self.device_ids)
 
         # Training configuration
-        cfg_trainer = config["trainer"]
-        self.epochs = cfg_trainer["epochs"]
-        self.save_ckpt_every = cfg_trainer["save_ckpt_every"]
-        self.write_logs_every = cfg_trainer["write_logs_every"]
+        self.epochs = self.train_options["epochs"]
+        self.save_ckpt_every = self.train_options["save_ckpt_every"]
+        self.write_logs_every = self.train_options["write_logs_every"]
         # Directory to save models and logs
         self.checkpoint_dir = config.checkpoint_dir
         self.log_dir = config.log_dir
         # Maximum number of checkpoints to keep
-        if "num_ckpt_to_keep" in cfg_trainer:
-            self.num_ckpt_to_keep = cfg_trainer["num_ckpt_to_keep"]
-        else:
-            self.num_ckpt_to_keep = None  # keep all
+        self.num_ckpt_to_keep = self.train_options["num_ckpt_to_keep"]
         self.saved_checkpoints = Queue(maxsize=0)  # checkpoint paths
 
         # Get logger
         self.logger = config.get_logger(
-            "trainer", verbosity=config["trainer"]["verbosity"])
+            "trainer", verbosity=self.train_options["verbosity"])
         # Setup visualization writer instance
         if self.log_dir is None:
             self.writer = None
         else:
             self.writer = TensorboardWriter(
-                self.log_dir, self.logger, enabled=cfg_trainer["tensorboard"])
+                self.log_dir, self.logger,
+                enabled=self.train_options["tensorboard"])
         # Resume checkpoint if specified
         if "resume" in config and config.resume is not None:
             self._resume_checkpoint(config.resume)

@@ -37,7 +37,7 @@ class ConfigParser:
         self.init_all()
 
         # Set save_dir where trained model and log will be saved
-        save_dir = self.config["trainer"]["save_dir"]
+        save_dir = self.config["trainer"]["args"]["train_options"]["save_dir"]
         if save_dir is None:
             self._checkpoint_dir = None
             self._log_dir = None

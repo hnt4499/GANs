@@ -77,18 +77,19 @@
                 }
             },
 
-            "callbacks": null
-        },
+            "callbacks": null,
 
-        "epochs": 100,
-
-        "save_dir": null,
-        "save_ckpt_every": 100,
-        "num_ckpt_to_keep": 5,
-        "save_images_every": 5,
-        "write_logs_every": 1,
-        "verbosity": 2,
-
-        "tensorboard": true
+            "train_options": {
+                "smooth_label": null,
+                "epochs": 100,
+                "save_dir": null,
+                "save_ckpt_every": 10,
+                "num_ckpt_to_keep": 5,
+                "save_images_every": 5,
+                "write_logs_every": 1,
+                "verbosity": 2,
+                "tensorboard": true
+            }
+        }
     }
 }

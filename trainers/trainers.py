@@ -20,15 +20,17 @@ class BaseGANTrainer(BaseTrainer):
         Instantiated generator architecture. A subclass of `base.BaseModel`,
         found in module `models.models`. For example
         `models.models.DCGANGenerator`.
-    config
-        The configurations parsed from a JSON file.
+    metrics
+        Instantiated metrics object, defined in `compile.metrics`, which gets
+        called every epoch and return the computed metric(s).
     data_loader
         Instantiated data loader. A subclass of `base.BaseDataLoader`, defined
         in module `data_loaders.data_loaders`. For example
         `data_loaders.data_loaders.ImageNetLoader`.
-    metrics
-        Instantiated metrics object, defined in `compile.metrics`, which gets
-        called every epoch and return the computed metric(s).
+    train_options : dict
+        Training options, e.g., the number of epochs.
+    config
+        The configurations parsed from a JSON file.
     callbacks : trainers.callbacks
         An early stopping callbacks, which gets called every epoch and return a
         boolean value indicating whether to stop the training process.
@@ -48,21 +50,15 @@ class BaseGANTrainer(BaseTrainer):
 
     """
 
-    def __init__(self, netD, netG, metrics, config, data_loader,
+    def __init__(self, netD, netG, metrics, data_loader, train_options, config,
                  callbacks=None):
         # Initialize BaseTrainer
-        super().__init__(netD, netG, config)
+        super().__init__(netD, netG, train_options, config)
         # Data loader
         self.data_loader = data_loader
         self.len_epoch = len(data_loader)
-        # Maximum number of checkpoints to keep
-        if "num_ckpt_to_keep" in self.config["trainer"]:
-            self.num_ckpt_to_keep = self.config["trainer"]["num_ckpt_to_keep"]
-        else:
-            self.num_ckpt_to_keep = -1  # keep all
-        self.saved_checkpoints = list()  # list of saved checkpoints' paths
         # Fixed noise checkpoint
-        self.save_images_every = self.config["trainer"]["save_images_every"]
+        self.save_images_every = self.train_options["save_images_every"]
         # Labels convention
         self.real_label = 1
         self.fake_label = 0

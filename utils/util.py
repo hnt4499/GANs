@@ -49,6 +49,40 @@ def forward_batch(model, inputs, device, batch_size=128):
     return torch.cat(outputs, dim=0)
 
 
+class DefaultDict(dict):
+    """Custom dictionary implementation with default value or default
+    constructor. This also implements `__getattr__` for compatibility and
+    convenience."""
+    def __init__(self, default_constructor=None, default_value=None, **kwargs):
+        """Initialize the custom dict.
+
+        Parameters
+        ----------
+        default_constructor : callable or None
+            If not None, this will be used to generate new value, and the
+            `default_value` will be skipped.
+        default_value
+            Default value of a new key-value pair.
+        **kwargs
+            Key-value pair(s).
+
+        """
+        super(DefaultDict, self).__init__(**kwargs)
+        self.default_constructor = default_constructor
+        self.default_value = default_value
+
+    def __getitem__(self, key):
+        if key not in self:
+            if self.default_constructor is not None:
+                self[key] = self.default_constructor()
+            else:
+                self[key] = self.default_value
+        return self.get(key)
+
+    def __getattr__(self, name):
+        return self[name]
+
+
 class Cache:
     """Helper class for data caching."""
     def __init__(self):
