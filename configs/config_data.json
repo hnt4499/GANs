@@ -1,0 +1,16 @@
+{
+    "data_loader": {
+        "type": "data_loader",
+        "name": "CelebALoader",
+        "args": {
+            "dataset": {
+                "type": "dataset",
+                "name": "CelebADatasetNpy",
+                "args": {"info_path": "/media/jupyter/Data/dataset/celeba/info.json", "transform": null}
+            },
+            "batch_size": 128,
+            "num_workers": 5,
+            "shuffle": false
+        }
+    }
+}

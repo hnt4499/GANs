@@ -1,0 +1,94 @@
+{
+    "name": "DCGAN",
+    "n_gpu": 1,
+    "seed": 136,
+
+    "trainer": {
+        "ignored": true,
+        "type": "trainer",
+        "name": "BaseGANTrainer",
+        "args": {
+            "netD": {
+                "type": "model",
+                "name": "DCGANDiscriminator",
+                "args": {
+                    "image_size": 64,
+                    "num_features": 64,
+                    "num_channels": 3,
+                    "conv_bias": false,
+                    "negative_slope": 0.2,
+                    "optimizer": {
+                        "type": "optimizer",
+                        "name": "Adam",
+                        "args": {"lr": 0.0001, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": false}
+                    },
+                    "criterion": {
+                        "type": "criterion",
+                        "name": "bce_loss",
+                        "args": {}
+                    },
+                    "weights_init": {
+                        "type": "weights_init",
+                        "name": "DCGAN_wi",
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    }
+                }
+            },
+            "netG": {
+                "type": "model",
+                "name": "DCGANGenerator",
+                "args": {
+                    "image_size": 64,
+                    "input_length": 100,
+                    "num_features": 64,
+                    "num_channels": 3,
+                    "conv_bias": false,
+                    "optimizer": {
+                        "type": "optimizer",
+                        "name": "Adam",
+                        "args": {"lr": 0.0001, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": true}
+                    },
+                    "criterion": {
+                        "type": "criterion",
+                        "name": "bce_loss",
+                        "args": {}
+                    },
+                    "weights_init": {
+                        "type": "weights_init",
+                        "name": "DCGAN_wi",
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    }
+                }
+            },
+            "metrics": null,
+
+            "data_loader": {
+                "type": "data_loader",
+                "name": "DummyDataLoader",
+                "args": {
+                    "dataset": {
+                        "type": "dataset",
+                        "name": "DummyDataset",
+                        "args": {"num_samples": 10000, "fill": null, "shape": [3, 64, 64], "dtype": "float32"}
+                    },
+                    "batch_size": 128,
+                    "num_workers": 4,
+                    "shuffle": true
+                }
+            },
+
+            "callbacks": null
+        },
+
+        "epochs": 100,
+
+        "save_dir": "/media/jupyter/Data/train/DCGAN",
+        "save_ckpt_every": 100,
+        "num_ckpt_to_keep": 5,
+        "save_images_every": 5,
+        "write_logs_every": 1,
+        "verbosity": 2,
+
+        "tensorboard": true
+    }
+}

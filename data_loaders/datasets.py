@@ -15,7 +15,12 @@ class DummyDataset(torch.utils.data.Dataset):
     num_samples : int
         Number of samples.
     fill : int or float or None
-        If None, fill the dataset sequentially (i.e., as in `range`).
+        If None, dataset is randomly sampled from a uniform distribution
+        according to the `dtype` provided.
+            If `dtype="int"` (or its variants), dataset is filled with random
+            integers from 0 to 255 (inclusively).
+            If `dtype="float" (or its variants)`, dataset is filled with random
+            float point number between 0 (inclusively) and 1 (exclusively).
         If not None, fill the dataset with this value.
     shape : list of integers
         Sample's shape. For example, if None, each sample is a scalar.
@@ -35,9 +40,11 @@ class DummyDataset(torch.utils.data.Dataset):
             data_shape += list(shape)
         # Create dummy dataset
         if fill is None:
-            num_entries = np.prod(data_shape)
-            self._data = np.arange(
-                num_entries, dtype=dtype).reshape(data_shape)
+            if "int" in dtype:
+                self._data = np.random.randint(
+                    low=0, high=256, size=data_shape, dtype=dtype)
+            else:
+                self._data = np.random.rand(*data_shape).astype(dtype)
         else:
             self._data = np.full(
                 shape=data_shape, fill_value=fill, dtype=dtype)
