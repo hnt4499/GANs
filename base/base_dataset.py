@@ -307,6 +307,7 @@ class BaseDatasetNpy(torch.utils.data.Dataset):
                 start = end
                 end += len(part_data)
                 self.data[start:end] = part_data
+                del part_data  # for memory efficiency
             self.data = torch.from_numpy(self.data)
 
         # Transformation function
