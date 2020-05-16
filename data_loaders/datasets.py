@@ -5,6 +5,7 @@ import pandas as pd
 import torch
 
 from base import BaseDataset, BaseDatasetWithLabels, BaseDatasetNpy
+from base import IMG_EXTENSIONS
 
 
 class DummyDataset(torch.utils.data.Dataset):
@@ -166,7 +167,8 @@ class CIFAR10DatasetWithLabels(BaseDatasetWithLabels):
     `cifar2png` package: https://github.com/knjcode/cifar2png. This class's
     object, when called, will return one tensor of images and one tensor of
     their respective labels"""
-    def __init__(self, root, transform, subset="train"):
+    def __init__(self, root, transform, drop_labels=None, stratified=True,
+                 subset="train"):
         """Initialize CIFAR-10 dataset.
 
         Parameters
@@ -186,34 +188,86 @@ class CIFAR10DatasetWithLabels(BaseDatasetWithLabels):
         transform : fn
             A function in `pre_processing.py` to be taken as the custom image
             transformation function.
+        drop_labels : float or None
+            If not None, change the labels of a part of the dataset to `-1`,
+            meaning no label. The number of such drops is calculated as
+            `math.ceil(num_datapoints_with_labels * drop_labels)`.
+        stratified : bool
+            If True, sampling data points to drop is done in a stratified
+            manner. Uniformly otherwise. Note that sampling uniformly is
+            faster.
         subset : str
             Subset of data to use. One of ["train", "test", "both"]. If "both",
             combine and use both train and test set.
 
-        """
-        self.labels = list()
-        self.cls = list()
-        # Get classes and class mapping based on "train" folder
-        self._get_cls(os.path.join(root, "train"))
-        self._get_cls_mapping()
+        Attributes
+        ----------
+        filepaths : list
+            List of all training file paths.
+        _labels : list
+            List of all labels for each image (in the same order) before label
+            dropping.
+        labels : ndarray
+            Array of all labels after label dropping.
+        cls : list
+            List of all class strings.
+        cls_mapping : dict
+            A dictionary that maps each class string with its index (label).
+        root
+        transform
+        drop_labels
+        stratified
+        subset
 
+        """
+        # Check validity
         if subset not in ["train", "test", "both"]:
             raise ValueError('Invalid subset. Expected one of ["train", '
                              '"test", "both"], got {} instead.'.format(subset))
-        # Read both train and test data
-        if subset == "both":
-            r = list()
-            for s in ["train", "test"]:
-                self.root = os.path.join(root, s)
-                self._get_file_paths()
-                r.append(self.root)
-            root = r  # a list containing paths to train and test directory
-            self._get_file_paths = lambda x: None  # turn this off
-        else:
-            root = os.path.join(root, subset)
+        self.subset = subset
         # Initialize base class
         super(CIFAR10DatasetWithLabels, self).__init__(
-            root=root, transform=transform)
+            root=root, transform=transform, drop_labels=drop_labels,
+            stratified=stratified)
+
+    def _get_cls(self):
+        """Read class information from folder "train"."""
+        train_dir = os.path.join(self.root, "train")
+        for cls in os.listdir(train_dir):
+            cls_dir = os.path.join(train_dir, cls)
+            if os.path.isdir(cls_dir):
+                self.cls.append(cls)
+
+    def _get_file_paths(self):
+        """Get file paths and their labels from a folder with the following
+        structure:
+            root
+            ├── train
+            │   ├── airplane
+            │   ├── automobile
+            │   └── ...
+            └── test
+                ├── airplane
+                ├── automobile
+                └── ...
+        """
+        if self.subset == "both":
+            s = ["train", "test"]
+        else:
+            s = [self.subset]
+        for ss in s:
+            subset_dir = os.path.join(self.root, ss)
+            for cls in self.cls:
+                cls_dir = os.path.join(subset_dir, cls)
+                if not os.path.isdir(cls_dir):
+                    continue
+                for filename in os.listdir(cls_dir):
+                    _, ext = os.path.splitext(filename)
+                    if ext.lower() not in IMG_EXTENSIONS:
+                        continue
+                    # Append
+                    self.filepaths.append(os.path.join(cls_dir, filename))
+                    self._labels.append(self.cls_mapping[cls])  # get class idx
 
 
 class CIFAR10DatasetWithoutLabels(CIFAR10DatasetWithLabels):

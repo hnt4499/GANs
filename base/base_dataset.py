@@ -1,4 +1,5 @@
 import os
+import math
 
 from PIL import Image
 import numpy as np
@@ -93,27 +94,65 @@ class BaseDataset(torch.utils.data.Dataset):
 class BaseDatasetWithLabels(BaseDataset):
     """Base class for dataset implementation which reads data from an image
     folder with class information.
+    Note that all datasets in this repository use label `-1` for images without
+    labels (e.g., for unsupervised or semi-supervised learning).
     This base class should only be used for small datasets (< 10K). For
     large datasets, see `BaseDatasetNpy`, which reads data from numpy array of
-    pre-processed images.
+    pre-processed images"""
+    def __init__(self, root, transform, drop_labels=None, stratified=True):
+        """
+        Initialize base dataset with labels.
 
-    Parameters
-    ----------
-    root : str
-        Root directory of the dataset.
-    transform : fn
-        A function defined in `data_loaders.pre_processing.py` to be taken as
-        the custom image transformation function.
+        Parameters
+        ----------
+        root : str
+            Root directory of the dataset.
+        transform : fn
+            A function defined in `data_loaders.pre_processing.py` to be taken
+            as the custom image transformation function.
+        drop_labels : float or None
+            If not None, change the labels of a part of the dataset to `-1`,
+            meaning no label. The number of such drops is calculated as
+            `math.ceil(num_datapoints_with_labels * drop_labels)`.
+        stratified : bool
+            If True, sampling data points to drop is done in a stratified
+            manner. Uniformly otherwise. Note that sampling uniformly is
+            faster.
 
-    Attributes
-    ----------
-    filepaths : list
-        List of all training file paths.
-    root
-    transform
+        Attributes
+        ----------
+        filepaths : list
+            List of all training file paths.
+        _labels : list
+            List of all labels for each image (in the same order) before label
+            dropping.
+        labels : ndarray
+            Array of all labels after label dropping.
+        cls : list
+            List of all class strings.
+        cls_mapping : dict
+            A dictionary that maps each class string with its index (label).
+        root
+        transform
+        drop_labels
+        stratified
 
-    """
-    def _get_cls(self, root):
+        """
+        self._labels = list()
+        self.cls = list()
+        self.root = root
+        # Starting initializing and reading information
+        self._get_cls()
+        self._get_cls_mapping()
+        # Initialize base class
+        super(BaseDatasetWithLabels, self).__init__(
+            root=root, transform=transform)
+        # Drop labels
+        self.drop_labels = drop_labels
+        self.stratified = stratified
+        self._drop_labels()
+
+    def _get_cls(self):
         """Get class names. Subclasses may overwrite this function if needed.
 
         Parameters
@@ -127,8 +166,8 @@ class BaseDatasetWithLabels(BaseDataset):
 
         """
         self.cls = list()
-        for cls in os.listdir(root):
-            cls_dir = os.path.join(root, cls)
+        for cls in os.listdir(self.root):
+            cls_dir = os.path.join(self.root, cls)
             if os.path.isdir(cls_dir):
                 self.cls.append(cls)
 
@@ -152,8 +191,6 @@ class BaseDatasetWithLabels(BaseDataset):
         Subclass may overwrite this function if necessary.
         """
         for cls in self.cls:
-            if cls not in self.cls:
-                self.cls.append(cls)
             cls_dir = os.path.join(self.root, cls)
             if not os.path.isdir(cls_dir):
                 continue
@@ -163,7 +200,37 @@ class BaseDatasetWithLabels(BaseDataset):
                     continue
                 # Append
                 self.filepaths.append(os.path.join(cls_dir, filename))
-                self.labels.append(self.cls_mapping[cls])  # get class index
+                self._labels.append(self.cls_mapping[cls])  # get class index
+
+    def _drop_labels(self):
+        """Drop labels of a part of the dataset"""
+        self.labels = np.asarray(self._labels, dtype="int")
+        if self.drop_labels is None:
+            return
+        idxs = np.arange(len(self.labels), dtype="int")
+        if self.stratified:
+            cls_idxs = list(self.cls_mapping.values())  # class indices
+            for cls_idx in cls_idxs:
+                # Get indices of data belonging to current class
+                idxs_with_labels = idxs[self.labels == cls_idx]
+                # Get number of datapoints to drop labels from
+                num_to_drop = math.ceil(
+                    len(idxs_with_labels) * self.drop_labels)
+                # Sample randomly
+                to_drop = np.random.choice(
+                    idxs_with_labels, size=num_to_drop, replace=False)
+                # Drop
+                self.labels[to_drop] = -1
+        else:
+            # Get indices of data with labels
+            idxs_with_labels = idxs[self.labels != -1]
+            # Get number of datapoints to drop labels from
+            num_to_drop = math.ceil(len(idxs_with_labels) * self.drop_labels)
+            # Sample randomly
+            to_drop = np.random.choice(
+                idxs_with_labels, size=num_to_drop, replace=False)
+            # Drop
+            self.labels[to_drop] = -1
 
     def __getitem__(self, idx):
         img = super(BaseDatasetWithLabels, self).__getitem__(idx)
