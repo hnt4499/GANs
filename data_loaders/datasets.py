@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from base import BaseDataset, BaseDatasetNpy
+from base import BaseDataset, BaseDatasetWithLabels, BaseDatasetNpy
 
 
 class DummyDataset(torch.utils.data.Dataset):
@@ -159,3 +159,66 @@ class CelebADataset(BaseDataset):
 
 class CelebADatasetNpy(BaseDatasetNpy):
     """CelebA dataset reader from *npy file(s)."""
+
+
+class CIFAR10DatasetWithLabels(BaseDatasetWithLabels):
+    """CIFAR-10 dataset reader, which must previously be downloaded using
+    `cifar2png` package: https://github.com/knjcode/cifar2png. This class's
+    object, when called, will return one tensor of images and one tensor of
+    their respective labels"""
+    def __init__(self, root, transform, subset="train"):
+        """Initialize CIFAR-10 dataset.
+
+        Parameters
+        ----------
+        root : str
+            Root directory of the CIFAR-10 dataset obtained from the package
+            `cifar2png` with the following tree structure:
+                root
+                ├── train
+                │   ├── airplane
+                │   ├── automobile
+                │   └── ...
+                └── test
+                    ├── airplane
+                    ├── automobile
+                    └── ...
+        transform : fn
+            A function in `pre_processing.py` to be taken as the custom image
+            transformation function.
+        subset : str
+            Subset of data to use. One of ["train", "test", "both"]. If "both",
+            combine and use both train and test set.
+
+        """
+        self.labels = list()
+        self.cls = list()
+        # Get classes and class mapping based on "train" folder
+        self._get_cls(os.path.join(root, "train"))
+        self._get_cls_mapping()
+
+        if subset not in ["train", "test", "both"]:
+            raise ValueError('Invalid subset. Expected one of ["train", '
+                             '"test", "both"], got {} instead.'.format(subset))
+        # Read both train and test data
+        if subset == "both":
+            r = list()
+            for s in ["train", "test"]:
+                self.root = os.path.join(root, s)
+                self._get_file_paths()
+                r.append(self.root)
+            root = r  # a list containing paths to train and test directory
+            self._get_file_paths = lambda x: None  # turn this off
+        else:
+            root = os.path.join(root, subset)
+        # Initialize base class
+        super(CIFAR10DatasetWithLabels, self).__init__(
+            root=root, transform=transform)
+
+
+class CIFAR10DatasetWithoutLabels(CIFAR10DatasetWithLabels):
+    """CIFAR-10 dataset reader, which must previously be downloaded using
+    `cifar2png` package: https://github.com/knjcode/cifar2png. This class's
+    object, when called, will return only one tensor of images"""
+    def __getitem__(self, idx):
+        return super(CIFAR10DatasetWithoutLabels, self).__getitem__(idx)[0]

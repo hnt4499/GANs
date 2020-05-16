@@ -17,3 +17,9 @@ class CelebALoader(BaseDataLoader):
     """
     CelebA data loader.
     """
+
+
+class CIFAR10Loader(BaseDataLoader):
+    """
+    CIFAR-10 data loader.
+    """

@@ -35,17 +35,21 @@ class BaseDataset(torch.utils.data.Dataset):
         self.root = root
         self.filepaths = list()
         self._data = None  # store loaded images
-
-        for filename in os.listdir(root):
-            _, ext = os.path.splitext(filename)
-            if ext.lower() not in IMG_EXTENSIONS:
-                continue
-            self.filepaths.append(os.path.join(root, filename))
+        self._get_file_paths()
         # Transformation function
         if transform is None:
             self.transform = lambda x: x  # identity function
         else:
             self.transform = transform
+
+    def _get_file_paths(self):
+        """Get training file paths with the depth of one. Subclasses may
+        overwrite this function if needed"""
+        for filename in os.listdir(self.root):
+            _, ext = os.path.splitext(filename)
+            if ext.lower() not in IMG_EXTENSIONS:
+                continue
+            self.filepaths.append(os.path.join(self.root, filename))
 
     def __len__(self):
         return len(self.filepaths)
@@ -84,6 +88,86 @@ class BaseDataset(torch.utils.data.Dataset):
             idxs = np.arange(num_samples)
         fn = lambda idx: self[idx]
         return list(map(fn, idxs))
+
+
+class BaseDatasetWithLabels(BaseDataset):
+    """Base class for dataset implementation which reads data from an image
+    folder with class information.
+    This base class should only be used for small datasets (< 10K). For
+    large datasets, see `BaseDatasetNpy`, which reads data from numpy array of
+    pre-processed images.
+
+    Parameters
+    ----------
+    root : str
+        Root directory of the dataset.
+    transform : fn
+        A function defined in `data_loaders.pre_processing.py` to be taken as
+        the custom image transformation function.
+
+    Attributes
+    ----------
+    filepaths : list
+        List of all training file paths.
+    root
+    transform
+
+    """
+    def _get_cls(self, root):
+        """Get class names. Subclasses may overwrite this function if needed.
+
+        Parameters
+        ----------
+        root : str
+            Path to the directory with the following structure:
+                root
+                ├── cls1
+                ├── cls2
+                └── ...
+
+        """
+        self.cls = list()
+        for cls in os.listdir(root):
+            cls_dir = os.path.join(root, cls)
+            if os.path.isdir(cls_dir):
+                self.cls.append(cls)
+
+    def _get_cls_mapping(self):
+        """Get a dictionary that maps each class string with its index"""
+        self.cls_mapping = dict(zip(self.cls, range(len(self.cls))))
+
+    def _get_file_paths(self):
+        """Get file paths and their labels from a folder with the following
+        structure:
+            root
+            ├── cls1
+            │   ├── img1.png # Image can be of any extensions
+            │   ├── img2.png
+            │   └── ...
+            ├── cls2
+            │   ├── img1.png # Image can be of any extensions
+            │   ├── img2.png
+            │   └── ...
+            └── ...
+        Subclass may overwrite this function if necessary.
+        """
+        for cls in self.cls:
+            if cls not in self.cls:
+                self.cls.append(cls)
+            cls_dir = os.path.join(self.root, cls)
+            if not os.path.isdir(cls_dir):
+                continue
+            for filename in os.listdir(cls_dir):
+                _, ext = os.path.splitext(filename)
+                if ext.lower() not in IMG_EXTENSIONS:
+                    continue
+                # Append
+                self.filepaths.append(os.path.join(cls_dir, filename))
+                self.labels.append(self.cls_mapping[cls])  # get class index
+
+    def __getitem__(self, idx):
+        img = super(BaseDatasetWithLabels, self).__getitem__(idx)
+        return img, self.labels[idx]
 
 
 class BaseDatasetNpy(torch.utils.data.Dataset):
