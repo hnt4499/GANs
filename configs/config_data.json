@@ -1,12 +1,22 @@
 {
     "data_loader": {
         "type": "data_loader",
-        "name": "CelebALoader",
+        "name": "CIFAR10Loader",
         "args": {
             "dataset": {
                 "type": "dataset",
-                "name": "CelebADatasetNpy",
-                "args": {"info_path": "/media/jupyter/Data/dataset/celeba/info.json", "transform": null}
+                "name": "CIFAR10DatasetWithLabels",
+                "args": {
+                    "root": "/media/jupyter/Data/dataset/cifar10/",
+                    "transform": {
+                        "type": "pre_processing",
+                        "name": "DCGAN_transform",
+                        "args": {"image_size": 32, "mean": 0.5, "std": 0.5}
+                    },
+                    "drop_labels": null,
+                    "stratified": true,
+                    "subset": "both"
+                }
             },
             "batch_size": 128,
             "num_workers": 5,
