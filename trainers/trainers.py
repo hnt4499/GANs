@@ -117,7 +117,7 @@ class BaseGANTrainer(BaseTrainer):
             # Forward pass real batch through discriminator
             output_D = self.netD(real_data).view(-1)
             # Calculate loss on all-real batch
-            loss_D_real = self.netD.criterion(output_D, None, labels_D)
+            loss_D_real = self.netD.criterion(output_D, labels_D)
             # Calculate gradients for discriminator in backward pass
             loss_D_real.backward()
             # Accuracy of discriminator on all-real batch
@@ -137,7 +137,7 @@ class BaseGANTrainer(BaseTrainer):
             # Classify all-fake batch with discriminator
             output_D = self.netD(generated_from_random_noise.detach()).view(-1)
             # Calculate discriminator's loss on the all-fake batch
-            loss_D_fake = self.netD.criterion(output_D, None, labels_D)
+            loss_D_fake = self.netD.criterion(output_D, labels_D)
             # Calculate the gradients for this batch
             loss_D_fake.backward()
             # (1 - accuracy) of discriminator on all-fake data before updating
@@ -159,7 +159,7 @@ class BaseGANTrainer(BaseTrainer):
             # of all-fake batch through discriminator
             output_D = self.netD(generated_from_random_noise).view(-1)
             # Calculate generator's loss based on this output
-            loss_G = self.netG.criterion(output_D, None, labels_G)
+            loss_G = self.netG.criterion(output_D, labels_G)
             # Calculate gradients for generator
             loss_G.backward()
             # (1 - accuracy) of discriminator on all-fake data after updating
