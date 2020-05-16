@@ -63,7 +63,7 @@
             "metrics": {
                 "0": {
                     "type": "metric",
-                    "name": "KIDScore",
+                    "name": "FIDScore",
                     "args": {
                         "model": {
                             "type": "features_extractor",
@@ -71,7 +71,7 @@
                             "args": {"output_layer": "Mixed_6e", "resize_to": null, "normalize_input": true, "transform_input": true,
                                      "batch_size": 128, "device": "cuda", "prune": true, "traverse_level": 1}
                         },
-                        "name": "kid", "max_samples": 10000, "kid_batch_size": 512, "dp": 4
+                        "name": "fid", "max_samples": 10000, "dp": 4
                     }
                 },
                 "comment": "This protocol is used to handle arguments as a list of objects.",
@@ -80,12 +80,12 @@
 
             "data_loader": {
                 "type": "data_loader",
-                "name": "CelebALoader",
+                "name": "CIFAR10Loader",
                 "args": {
                     "dataset": {
                         "type": "dataset",
-                        "name": "CelebADatasetNpy",
-                        "args": {"info_path": "/media/jupyter/Data/dataset/celeba/info.json", "transform": null}
+                        "name": "CIFAR10DatasetWithoutLabelsNpy",
+                        "args": {"info_path": "/media/jupyter/Data/dataset/cifar10/info.json", "transform": null}
                     },
                     "batch_size": 128,
                     "num_workers": 0,

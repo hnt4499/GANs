@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import torch
 
-from base import BaseDataset, BaseDatasetWithLabels, BaseDatasetNpy
+from base import (BaseDataset, BaseDatasetWithLabels, BaseDatasetNpy,
+                  BaseDatasetWithLabelsNpy)
 from base import IMG_EXTENSIONS
 
 
@@ -276,3 +277,11 @@ class CIFAR10DatasetWithoutLabels(CIFAR10DatasetWithLabels):
     object, when called, will return only one tensor of images"""
     def __getitem__(self, idx):
         return super(CIFAR10DatasetWithoutLabels, self).__getitem__(idx)[0]
+
+
+class CIFAR10DatasetWithLabelsNpy(BaseDatasetWithLabelsNpy):
+    """CIFAR-10 dataset reader from *npy file(s) with labels."""
+
+
+class CIFAR10DatasetWithoutLabelsNpy(BaseDatasetNpy):
+    """CIFAR-10 dataset reader from *npy file(s) without labels."""
