@@ -1,4 +1,5 @@
 import math
+from collections import OrderedDict
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -61,9 +62,11 @@ class DCGANDiscriminator(BaseGANDiscriminator):
             raise ValueError("Invalid value for `num_channels`. Expected one "
                              "of [1, 3], got {} instead.".format(num_features))
 
-        seq = list()
+        seq = OrderedDict()
+        li = 0  # convolutional layer index
+        layer_name = "Conv2d_{}_4x4".format(li)
         # First layer
-        seq.extend([
+        seq[layer_name] = nn.Sequential(*[
             nn.Conv2d(
                 in_channels=num_channels, out_channels=num_features,
                 kernel_size=4, stride=2, padding=1, bias=conv_bias),
@@ -72,9 +75,13 @@ class DCGANDiscriminator(BaseGANDiscriminator):
         # The rest of the intermediate layers
         out_channels = num_features
         for i in range(self.num_layers - 1):
+            # Layer name
+            li += 1
+            layer_name = "Conv2d_{}_4x4".format(li)
+
             in_channels = out_channels
             out_channels = in_channels * 2
-            seq.extend([
+            seq[layer_name] = nn.Sequential(*[
                 nn.Conv2d(
                     in_channels=in_channels, out_channels=out_channels,
                     kernel_size=4, stride=2, padding=1, bias=False),
@@ -82,20 +89,19 @@ class DCGANDiscriminator(BaseGANDiscriminator):
                 nn.LeakyReLU(negative_slope, inplace=True)
             ])
         # The output layer
-        seq.extend([
+        li += 1
+        layer_name = "Conv2d_{}_4x4".format(li)
+        seq[layer_name] = nn.Sequential(*[
             nn.Conv2d(
                 in_channels=out_channels, out_channels=1, kernel_size=4,
                 stride=1, padding=0, bias=False),
             nn.Sigmoid()
         ])
 
-        # Forward sequence
-        self.fw = nn.Sequential(*seq)
+        # Construct using OrderedDict
+        self.construct(seq)
         # Initialize optimizer and model weights
         self.init()
-
-    def forward(self, x):
-        return self.fw(x)
 
 
 class DCGANGenerator(BaseGANGenerator):

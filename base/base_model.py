@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch.nn as nn
 import numpy as np
 from abc import abstractmethod
@@ -7,15 +9,9 @@ class BaseModel(nn.Module):
     """
     Base class for all models
     """
-    @abstractmethod
-    def forward(self, *inputs):
-        """Forward pass logic.
-        Returns
-        -------
-            Model output.
-
-        """
-        raise NotImplementedError
+    def __init__(self):
+        super(BaseModel, self).__init__()
+        self.modules = list()  # list of module names
 
     def __str__(self):
         """
@@ -24,6 +20,46 @@ class BaseModel(nn.Module):
         model_parameters = filter(lambda p: p.requires_grad, self.parameters())
         params = sum([np.prod(p.size()) for p in model_parameters])
         return super().__str__() + "\nTrainable parameters: {}".format(params)
+
+    def __setattr__(self, name, value):
+        """Set an attribute as in its parent class `nn.Module` and build the
+        hierarchy at the same time"""
+        # Set module as in parent class `nn.Module`
+        super(BaseModel, self).__setattr__(name, value)
+        # Build the hierarchy
+        if isinstance(value, nn.Module):
+            self.modules.append(name)
+
+    def forward(self, inputs):
+        """Forward pass logic. By default, this will pass sequentially in the
+        order in which the modules have been set.
+
+        Returns
+        -------
+            Model output.
+
+        """
+        return self.forward_all(inputs)
+
+    def forward_all(self, inp):
+        """Forward sequentially in the order in which the modules have been set
+        """
+        out = inp
+        for module in self.modules:
+            out = self.__getattr__(module)(out)
+        return out
+
+    def construct(self, sequence):
+        """Automatically construct model based on the OrderedDict passed.
+
+        Parameters
+        ----------
+        sequence : OrderedDict
+            Ordered dictionary of (module_name, module).
+
+        """
+        for module_name, module in sequence.items():
+            self.__setattr__(module_name, module)
 
 
 class BaseGANComponent(BaseModel):
