@@ -63,32 +63,32 @@ class BaseModel(nn.Module):
 
 
 class BaseGANComponent(BaseModel):
-    """Base class for all discriminators and generators.
-
-    Parameters
-    ----------
-    optimizer : fn
-        A function initialized in `compile.optimizers` that takes only the
-        model trainable parameters as input.
-    criterion : fn
-        A function initialized in `compile.criterion` that takes the model
-        predictions and target labels, and return the computed loss.
-    metric : fn
-        A function initialized in `compile.metrics` that takes the model
-        predictions and target labels, and return the computed metric.
-    weights_init : fn
-        A function initialized in `models.weights_init` that will then be
-        passed to `model.apply()`.
-
-    Attributes
-    ----------
-    optimizer
-    criterion
-    metric
-    weights_init
-
-    """
+    """Base class for all discriminators and generators."""
     def __init__(self, optimizer, criterion, weights_init=None):
+        """
+        Parameters
+        ----------
+        optimizer : fn
+            A function initialized in `compile.optimizers` that takes only the
+            model trainable parameters as input.
+        criterion : fn
+            A function initialized in `compile.criterion` that takes the model
+            predictions and target labels, and return the computed loss.
+        metric : fn
+            A function initialized in `compile.metrics` that takes the model
+            predictions and target labels, and return the computed metric.
+        weights_init : fn
+            A function initialized in `models.weights_init` that will then be
+            passed to `model.apply()`.
+
+        Attributes
+        ----------
+        optimizer
+        criterion
+        metric
+        weights_init
+
+        """
         super(BaseGANComponent, self).__init__()
         # Cache data
         self.optimizer = optimizer
@@ -108,65 +108,42 @@ class BaseGANComponent(BaseModel):
 
 
 class BaseGANDiscriminator(BaseGANComponent):
-    """Base class for all GAN discriminators.
-
-    Parameters
-    ----------
-    optimizer : fn
-        A function initialized in `compile.optimizers` that takes only the
-        model trainable parameters as input.
-    criterion : fn
-        A function initialized in `compile.criterion` that takes the model
-        predictions and target labels, and return the computed loss.
-    metric : fn
-        A function initialized in `compile.metrics` that takes the model
-        predictions and target labels, and return the computed metric.
-    weights_init : fn
-        A function initialized in `models.weights_init` that will then be
-        passed to `model.apply()`.
-
-    Attributes
-    ----------
-    optimizer
-    criterion
-    metric
-    weights_init
-
-    """
+    """Base class for all GAN discriminators."""
 
 
 class BaseGANGenerator(BaseGANComponent):
-    """Base class for all GAN discriminators.
-
-    Parameters
-    ----------
-    optimizer : fn
-        A function initialized in `compile.optimizers` that takes only the
-        model trainable parameters as input.
-    criterion : fn
-        A function initialized in `compile.criterion` that takes the model
-        predictions and target labels, and return the computed loss.
-    metric : fn
-        A function initialized in `compile.metrics` that takes the model
-        predictions and target labels, and return the computed metric.
-    weights_init : fn
-        A function initialized in `models.weights_init` that will then be
-        passed to `model.apply()`.
-    output_range : tuple
-        Tuple of (`min_value`, `max_value`) representing the output range of
-        the generator. (-1.0, 1.0) by default, which is the output range of the
-        Tanh layer.
-
-    Attributes
-    ----------
-    optimizer
-    criterion
-    metric
-    weights_init
-
-    """
+    """Base class for all GAN discriminators."""
     def __init__(self, optimizer, criterion, weights_init=None,
                  output_range=(-1.0, 1.0)):
+        """
+        Parameters
+        ----------
+        optimizer : fn
+            A function initialized in `compile.optimizers` that takes only the
+            model trainable parameters as input.
+        criterion : fn
+            A function initialized in `compile.criterion` that takes the model
+            predictions and target labels, and return the computed loss.
+        metric : fn
+            A function initialized in `compile.metrics` that takes the model
+            predictions and target labels, and return the computed metric.
+        weights_init : fn
+            A function initialized in `models.weights_init` that will then be
+            passed to `model.apply()`.
+        output_range : tuple
+            Tuple of (`min_value`, `max_value`) representing the output range
+            of the generator. (-1.0, 1.0) by default, which is the output range
+            of the Tanh layer.
+
+        Attributes
+        ----------
+        optimizer
+        criterion
+        metric
+        weights_init
+        output_range
+
+        """
         super(BaseGANGenerator, self).__init__(
             optimizer, criterion, weights_init)
         self.output_range = output_range
