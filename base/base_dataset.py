@@ -361,6 +361,10 @@ class BaseDatasetWithLabelsNpy(BaseDatasetNpy):
             All images loaded as torch tensor.
         filepaths : list
             List of paths to all parts.
+        cls : list
+            List of all class strings.
+        cls_mapping : dict
+            A dictionary that maps each class string with its index (label).
         _labels : list
             List of all labels for each image (in the same order) before label
             dropping.
@@ -374,6 +378,8 @@ class BaseDatasetWithLabelsNpy(BaseDatasetNpy):
         """
         super(BaseDatasetWithLabelsNpy, self).__init__(
             info_path=info_path, transform=transform)
+        sefl.cls_mapping = self.info["cls_mapping"]
+        self.cls = list(self.cls_mapping.keys())
         # Load labels
         self._labels = list()
         self._load_labels()

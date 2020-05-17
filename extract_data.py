@@ -97,6 +97,8 @@ def extract_data(data_loader, out_path, save_labels, auto_split=True,
             info["num_parts"] = num_parts
             info["num_images"] = len(data_loader.dataset)
             info["parts"] = OrderedDict()
+            if save_labels:
+                info["cls_mapping"] = data_loader.dataset.cls_mapping
         # Start of a new part
         if batch_idx % num_batches_in_a_part == 0:
             # Save previous part
