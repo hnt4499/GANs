@@ -378,10 +378,9 @@ class BaseDatasetWithLabelsNpy(BaseDatasetNpy):
         """
         super(BaseDatasetWithLabelsNpy, self).__init__(
             info_path=info_path, transform=transform)
-        sefl.cls_mapping = self.info["cls_mapping"]
+        self.cls_mapping = self.info["cls_mapping"]
         self.cls = list(self.cls_mapping.keys())
         # Load labels
-        self._labels = list()
         self._load_labels()
         # Drop labels
         self.drop_labels = drop_labels
@@ -390,6 +389,7 @@ class BaseDatasetWithLabelsNpy(BaseDatasetNpy):
 
     def _load_labels(self):
         parts = self.info["parts"]
+        labels = list()
         for part_idx, part_info in parts.items():
             labels_path = part_info["labels_path"]
             labels.append(np.load(labels_path))
@@ -402,6 +402,10 @@ class BaseDatasetWithLabelsNpy(BaseDatasetNpy):
         self.labels = drop_labels_helper(
             self.labels, drop_fraction=self.drop_labels, fill=-1,
             stratified=self.stratified)
+
+    def __getitem__(self, idx):
+        img = super(BaseDatasetWithLabelsNpy, self).__getitem__(idx)
+        return img, self.labels[idx]
 
 
 """
