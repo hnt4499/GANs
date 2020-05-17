@@ -103,6 +103,7 @@
                 "num_ckpt_to_keep": 5,
                 "save_images_every": 100,
                 "write_logs_every": 5,
+                "evaluate_every": 5,
                 "verbosity": 2,
                 "tensorboard": true
             }

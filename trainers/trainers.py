@@ -257,9 +257,11 @@ class BaseGANTrainer(BaseTrainer):
         # For generator, don't allow any metrics other than loss
         self.tracker.update("loss_G", self.current("loss_G"))
         # Compute custom metrics and update to tracker
-        custom_metrics = self.custom_metrics.compute()
-        for met_name, met in custom_metrics.items():
-            self.tracker.update(met_name, met)
+        if self.current("global_step") % self.evaluate_every == 0 \
+                and self.current("global_step") != 0:
+            custom_metrics = self.custom_metrics.compute()
+            for met_name, met in custom_metrics.items():
+                self.tracker.update(met_name, met)
 
     def _write_log(self):
         """Helper function to write logs every `self.write_logs_every`

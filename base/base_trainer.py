@@ -37,6 +37,7 @@ class BaseTrainer:
         self.epochs = self.train_options["epochs"]
         self.save_ckpt_every = self.train_options["save_ckpt_every"]
         self.write_logs_every = self.train_options["write_logs_every"]
+        self.evaluate_every = self.train_options["evaluate_every"]
         # Directory to save models and logs
         self.checkpoint_dir = config.checkpoint_dir
         self.log_dir = config.log_dir
