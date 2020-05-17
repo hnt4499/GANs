@@ -294,3 +294,201 @@ class BaseGANTrainer(BaseTrainer):
         current = batch_idx * self.data_loader.batch_size
         total = self.data_loader.n_samples
         return self._get_progess(current, total)
+
+
+class CatGANTrainer(BaseGANTrainer):
+    """Training logic for CatGAN. This makes use of label information and
+    goodness of fit measures (by using Shannon entropy with reasonable
+    assumptions about the discriminator and generator output distribution) to
+    infer new losses (even there is no label in the dataset). Hence, this can
+    handle both unsupervised and semi-supervised learning.
+
+    Reference:
+        Jost Tobias Springenberg. (2016). Unsupervised and Semi-supervised
+        Learning with Categorical Generative Adversarial Networks
+
+    Parameters
+    ----------
+    netD
+        Instantiated discriminator architecture. A subclass of
+        `base.BaseModel`, found in module `models.models`. For example
+        `models.models.CatGANDiscriminator`.
+    netG
+        Instantiated generator architecture. A subclass of `base.BaseModel`,
+        found in module `models.models`. For example
+        `models.models.CatGANGenerator`.
+    metrics
+        Instantiated metrics object, defined in `compile.metrics`, which gets
+        called every epoch and return the computed metric(s).
+    data_loader
+        Instantiated data loader. A subclass of `base.BaseDataLoader`, defined
+        in module `data_loaders.data_loaders`. The dataset must return labels
+        for every observation (return `-1`s for non-labeled data). For example
+        `data_loaders.data_loaders.CIFAR10Loader`.
+    train_options : dict
+        Training options, e.g., the number of epochs.
+    config
+        The configurations parsed from a JSON file.
+    callbacks : trainers.callbacks
+        An early stopping callbacks, which gets called every epoch and return a
+        boolean value indicating whether to stop the training process.
+
+    Attributes
+    ----------
+    fixed_noise
+        The fixed noise input tensor, which is fixed and fed into the generator
+        to visually see the training progress.
+    tracker : utils.MetricTracker
+        Used to track the metrics such as loss.
+    writer : logger.TensorboardWriter
+        A Tensorboard writer.
+    config
+    data_loader
+    model
+
+    """
+    def __init__(self, netD, netG, metrics, data_loader, train_options, config,
+                 callbacks=None):
+        super(CatGANTrainer, self).__init__(
+            netD=netD, netG=netG, metrics=metrics, data_loader=data_loader,
+            train_options=train_options, config=config, callbacks=None)
+        self.tracker = MetricTracker(
+            "loss_D", "loss_G", *self.custom_metrics.metric_names,
+            writer=self.writer)
+
+    def _train_epoch(self):
+        """Training logic for an epoch.
+
+        Parameters
+        ----------
+        epoch : int
+            Current training epoch.
+
+        Returns
+        -------
+            A log that contains average loss and metrics in this epoch.
+
+        """
+        self.netD.train()
+        self.netG.train()
+        self.tracker.reset()
+        # Get loss
+        con_D, mar_D, ce_D = self.netD.criterion
+        con_G, mar_G = self.netG.criterion
+
+        for batch_idx, (real_data, real_labels) in enumerate(self.data_loader):
+            # Batch start
+            self.on_batch_start()
+            """
+            DISCRIMINATOR
+            Update discriminator network with all-real batch. Maximize
+            H[p(y | D)] - E[H[p(y | x, D)]] + λ * E[CE(y_label, p(y | x, D))]
+            """
+            self.netD.zero_grad()
+            # Format batch
+            real_data = real_data.to(self.device)
+            real_labels = real_labels.to(self.device)
+            batch_size = real_data.size(0)
+            # Forward pass real batch through discriminator
+            output_D = self.netD(real_data).view(batch_size, -1)
+            # Separate data with and without labels
+            with_labels = (real_labels != -1)
+            labels_D = real_labels[with_labels]
+            output_D_wl = output_D[with_labels]
+            output_D_wol = output_D[~with_labels]
+            # Calculate loss
+            loss_D_real = (-mar_D(output_D_wol) + con_D(output_D_wol) -
+                           1 * ce_D(output_D_wl, labels_D))  # λ = 1 for now
+            # Calculate gradients for discriminator in backward pass
+            loss_D_real.backward()
+
+            """
+            DISCRIMINATOR
+            Update discriminator network with all-fake batch. Maximize
+            E[H[p(y | G(z), D)]]
+            """
+            # Input noise
+            noise = torch.randn(
+                batch_size, self.length_z, 1, 1, device=self.device)
+            # Generate fake image batch with generator
+            generated_from_random_noise = self.netG(noise)
+            # Classify all-fake batch with discriminator
+            output_D = self.netD(generated_from_random_noise.detach()).view(
+                batch_size, -1)
+            # Calculate discriminator's loss on the all-fake batch
+            loss_D_fake = -con_D(output_D)
+            # Calculate the gradients for this batch
+            loss_D_fake.backward()
+            # Add the gradients from the all-real and all-fake batches
+            loss_D = loss_D_real + loss_D_fake
+            # Update discriminator
+            self.netD.optimizer.step()
+
+            """
+            GENERATOR
+            Update generator network.
+            Minimize -H[p(y | D)] + E[H[p(y | G(z), D)]]
+            """
+            self.netG.zero_grad()
+            # Since we just updated discriminator, perform another forward pass
+            # of all-fake batch through discriminator
+            output_D = self.netD(generated_from_random_noise).view(
+                batch_size, -1)
+            # Calculate generator's loss based on this output
+            loss_G = -mar_G(output_D) + con_G(output_D)
+            # Calculate gradients for generator
+            loss_G.backward()
+            # Update generator
+            self.netG.optimizer.step()
+
+            # Cache data for future use; and send all data to cpu
+            with torch.no_grad():
+                generated_from_fixed_noise = self.netG(
+                    self.fixed_noise).detach()
+            self.current_batch.cache(
+                batch_idx=batch_idx,
+                batch_size=batch_size,
+                global_step=self.epoch * self.len_epoch + batch_idx,
+
+                real_samples=real_data.cpu(),
+                fixed_noise=self.fixed_noise.cpu(),
+                generated_from_fixed_noise=generated_from_fixed_noise.cpu(),
+                random_noise=noise.cpu(),
+                generated_from_random_noise=generated_from_random_noise.cpu(),
+                output_D=output_D.cpu(),  # disc. output for generated images
+
+                loss_D=loss_D.item(),
+                loss_G=loss_G.item(),
+            )
+
+            # Batch end
+            self.on_batch_end()
+            # Early stopping
+            if self.stop:
+                break
+
+        return self.tracker.result()
+
+    def _update_tracker(self):
+        """Update tracker"""
+        self.tracker.update("loss_D", self.current("loss_D"))
+        self.tracker.update("loss_G", self.current("loss_G"))
+        # Compute custom metrics and update to tracker
+        if self.current("global_step") % self.evaluate_every == 0 \
+                and self.current("global_step") != 0:
+            custom_metrics = self.custom_metrics.compute()
+            for met_name, met in custom_metrics.items():
+                self.tracker.update(met_name, met)
+
+    def _write_log(self):
+        """Helper function to write logs every `self.write_logs_every`
+        batches."""
+        # Default info
+        to_print = "{}{}\tLoss_D: {:.6f}\tLoss_G: {:.6f}".format(
+                self._progress_epoch(self.epoch),
+                self._progress_batch(self.current("batch_idx")),
+                self.current("loss_D"), self.current("loss_G"))
+        # Add custom metrics info
+        for met in self.custom_metrics.metrics:
+            to_print += "\t{}".format(str(met))
+        self.logger.info(to_print)
