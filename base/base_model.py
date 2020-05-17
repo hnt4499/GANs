@@ -30,6 +30,24 @@ class BaseModel(nn.Module):
         if isinstance(value, nn.Module):
             self.modules.append(name)
 
+    def __getitem__(self, key):
+        """Get item as if this is a traditional dictionary, except that key
+        could be an integer or a string.
+
+        Parameters
+        ----------
+        key : int or str
+            If int, take it as the index.
+            If str, take it as a key as usual.
+
+        """
+        if isinstance(key, int):
+            key = self.modules[key]
+        return self.__getattr__(key)
+
+    def __setitem__(self, key, value):
+        self.__setattr__(key, value)
+
     def forward(self, inputs):
         """Forward pass logic. By default, this will pass sequentially in the
         order in which the modules have been set.
