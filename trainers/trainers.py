@@ -372,9 +372,10 @@ class CatGANTrainer(BaseGANTrainer):
         self.netD.train()
         self.netG.train()
         self.tracker.reset()
-        # Get loss
-        con_D, mar_D, ce_D = self.netD.criterion
-        con_G, mar_G = self.netG.criterion
+        # Get losses
+        con_D, mar_D, ce_D, lambd = self.netD.criterion[
+            ["con_loss", "mar_loss", "ce_loss", "lambd"]]
+        con_G, mar_G = self.netG.criterion[["con_loss", "mar_loss"]]
         # Gradient direction
         pos = torch.tensor(1.).to(self.device)
         neg = torch.tensor(-1.).to(self.device)
@@ -411,7 +412,7 @@ class CatGANTrainer(BaseGANTrainer):
             loss_D_r2 = con_D(output_D_wol)
             loss_D_r2.backward(gradient=pos, retain_graph=True)
             # Cross-entropy loss
-            loss_D_r3 = 1 * ce_D(output_D_wl, labels_D)  # λ = 1 for now
+            loss_D_r3 = lambd * ce_D(output_D_wl, labels_D)
             loss_D_r3.backward(gradient=neg)
             # Total loss
             loss_D_real = loss_D_r1 + loss_D_r2 + loss_D_r3

@@ -24,20 +24,13 @@
                         "args": {"lr": 0.0001, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": false}
                     },
                     "criterion": {
-                        "0": {
-                            "type": "criterion",
-                            "name": "conditional_shannon",
-                            "args": {}
-                        },
-                        "1": {
-                            "type": "criterion",
-                            "name": "marginal_shannon",
-                            "args": {}
-                        },
-                        "2": {
-                            "type": "criterion",
-                            "name": "ce_loss",
-                            "args": {}
+                        "type": "criterion",
+                        "name": "CatGANDiscriminatorLoss",
+                        "args": {
+                            "con_loss": {"type": "criterion", "name": "conditional_shannon", "args": {}},
+                            "mar_loss": {"type": "criterion", "name": "marginal_shannon", "args": {}},
+                            "ce_loss": {"type": "criterion", "name": "ce_loss", "args": {}},
+                            "lambd": 1
                         }
                     },
                     "weights_init": {
@@ -62,15 +55,11 @@
                         "args": {"lr": 0.0001, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": true}
                     },
                     "criterion": {
-                        "0": {
-                            "type": "criterion",
-                            "name": "conditional_shannon",
-                            "args": {}
-                        },
-                        "1": {
-                            "type": "criterion",
-                            "name": "marginal_shannon",
-                            "args": {}
+                        "type": "criterion",
+                        "name": "CatGANGeneratorLoss",
+                        "args": {
+                            "con_loss": {"type": "criterion", "name": "conditional_shannon", "args": {}},
+                            "mar_loss": {"type": "criterion", "name": "marginal_shannon", "args": {}}
                         }
                     },
                     "weights_init": {
