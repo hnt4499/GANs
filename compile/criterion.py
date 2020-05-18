@@ -34,7 +34,7 @@ def conditional_shannon():
             Jost Tobias Springenberg. (2016). Unsupervised and Semi-supervised
             Learning with Categorical Generative Adversarial Networks
         """
-        log_probs = torch.log(probs)
+        log_probs = torch.log(probs + 1e-6)  # for numerical stability
         p = (-probs * log_probs).sum(axis=1)
         return p.mean()
     return con_H
@@ -48,6 +48,6 @@ def marginal_shannon():
             Learning with Categorical Generative Adversarial Networks
         """
         p = probs.mean(axis=0)
-        log_probs = torch.log(p)
+        log_probs = torch.log(p + 1e-6)  # for numerical stability
         return -(p * log_probs).sum()
     return mar_H

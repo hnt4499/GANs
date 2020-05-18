@@ -18,7 +18,7 @@ class DCGANDiscriminator(BaseGANDiscriminator):
         ----------
         image_size : int
             Discriminator's output image size. Must be of the form `2 ** n`,
-            n >= 6 (e.g., 64 or 128).
+            n >= 5 (e.g., 32 or 64).
         num_features : int
             Number of channels of the first layer. The number of channels of
             a layer is as twice as that of its precedent layer
@@ -52,7 +52,7 @@ class DCGANDiscriminator(BaseGANDiscriminator):
         self.negative_slope = negative_slope
         # Number of intermediate layers
         num_layers = math.log(image_size, 2) - 2
-        if num_layers.is_integer() and num_layers >= 4:
+        if num_layers.is_integer() and num_layers >= 3:
             self.num_layers = int(num_layers)
         else:
             raise ValueError(
@@ -115,8 +115,8 @@ class DCGANGenerator(BaseGANGenerator):
         Parameters
         ----------
         image_size : int
-            Generator's output image size. Must be of the form `2 ** n`, n >= 6
-            (e.g., 64 or 128).
+            Generator's output image size. Must be of the form `2 ** n`, n >= 5
+            (e.g., 32 or 64).
         input_length : int
             Length of the noise input `z`. `z` is simply "transposed
             z-dimensional vector" of shape (1, 1, z).
@@ -153,7 +153,7 @@ class DCGANGenerator(BaseGANGenerator):
         self.conv_bias = conv_bias
         # Number of intermediate layers
         num_layers = math.log(image_size, 2) - 2
-        if num_layers.is_integer() and num_layers >= 4:
+        if num_layers.is_integer() and num_layers >= 3:
             self.num_layers = int(num_layers)
         else:
             raise ValueError(

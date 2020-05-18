@@ -23,11 +23,11 @@ class CatGANDiscriminator(BaseGANDiscriminator):
         ----------
         image_size : int
             Discriminator's output image size. Must be of the form `2 ** n`,
-            n >= 6 (e.g., 64 or 128).
+            n >= 5 (e.g., 32 or 64).
         num_features : int
             Number of channels of the first layer. The number of channels of
             a layer is as twice as that of its precedent layer
-            (e.g, 64 -> 128 -> 256 -> 512 -> 1024).
+            (e.g, 32 -> 64 -> 128 -> 256).
         num_channels : int
             One of [1, 3]. Number of input image channels.
         num_classes : int
@@ -58,17 +58,6 @@ class CatGANDiscriminator(BaseGANDiscriminator):
         self.num_classes = num_classes
         self.conv_bias = conv_bias
         self.negative_slope = negative_slope
-        # Number of intermediate layers
-        num_layers = math.log(image_size, 2) - 2
-        if num_layers.is_integer() and num_layers >= 4:
-            self.num_layers = int(num_layers)
-        else:
-            raise ValueError(
-                "Invalid value for `image_size`: {}".format(image_size))
-        # Number of channels
-        if num_channels not in [1, 3]:
-            raise ValueError("Invalid value for `num_channels`. Expected one "
-                             "of [1, 3], got {} instead.".format(num_features))
 
         # Get layers from DCGAN, except the last layer
         dcgan = DCGANDiscriminator(
@@ -76,6 +65,7 @@ class CatGANDiscriminator(BaseGANDiscriminator):
             num_channels=num_channels, conv_bias=conv_bias,
             negative_slope=negative_slope, optimizer=optimizer,
             criterion=criterion, weights_init=weights_init)
+        self.num_layers = dcgan.num_layers
         for module_name in dcgan.modules[:-1]:
             self[module_name] = dcgan[module_name]
 

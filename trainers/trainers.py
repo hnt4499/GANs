@@ -375,6 +375,9 @@ class CatGANTrainer(BaseGANTrainer):
         # Get loss
         con_D, mar_D, ce_D = self.netD.criterion
         con_G, mar_G = self.netG.criterion
+        # Gradient direction
+        pos = torch.tensor(1.).to(self.device)
+        neg = torch.tensor(-1.).to(self.device)
 
         for batch_idx, (real_data, real_labels) in enumerate(self.data_loader):
             # Batch start
@@ -384,6 +387,11 @@ class CatGANTrainer(BaseGANTrainer):
             Update discriminator network with all-real batch. Maximize
             H[p(y | D)] - E[H[p(y | x, D)]] + λ * E[CE(y_label, p(y | x, D))]
             """
+            # Freeze netG and unfreeze netD
+            for p in self.netD.parameters():
+                p.requires_grad = True
+            for p in self.netG.parameters():
+                p.requires_grad = False
             self.netD.zero_grad()
             # Format batch
             real_data = real_data.to(self.device)
@@ -396,11 +404,17 @@ class CatGANTrainer(BaseGANTrainer):
             labels_D = real_labels[with_labels]
             output_D_wl = output_D[with_labels]
             output_D_wol = output_D[~with_labels]
-            # Calculate loss
-            loss_D_real = (-mar_D(output_D_wol) + con_D(output_D_wol) -
-                           1 * ce_D(output_D_wl, labels_D))  # λ = 1 for now
-            # Calculate gradients for discriminator in backward pass
-            loss_D_real.backward()
+            # Marginal loss
+            loss_D_r1 = mar_D(output_D_wol)
+            loss_D_r1.backward(gradient=neg, retain_graph=True)
+            # Conditional loss
+            loss_D_r2 = con_D(output_D_wol)
+            loss_D_r2.backward(gradient=pos, retain_graph=True)
+            # Cross-entropy loss
+            loss_D_r3 = 1 * ce_D(output_D_wl, labels_D)  # λ = 1 for now
+            loss_D_r3.backward(gradient=neg)
+            # Total loss
+            loss_D_real = loss_D_r1 + loss_D_r2 + loss_D_r3
 
             """
             DISCRIMINATOR
@@ -416,9 +430,8 @@ class CatGANTrainer(BaseGANTrainer):
             output_D = self.netD(generated_from_random_noise.detach()).view(
                 batch_size, -1)
             # Calculate discriminator's loss on the all-fake batch
-            loss_D_fake = -con_D(output_D)
-            # Calculate the gradients for this batch
-            loss_D_fake.backward()
+            loss_D_fake = con_D(output_D)
+            loss_D_fake.backward(gradient=neg)
             # Add the gradients from the all-real and all-fake batches
             loss_D = loss_D_real + loss_D_fake
             # Update discriminator
@@ -429,15 +442,28 @@ class CatGANTrainer(BaseGANTrainer):
             Update generator network.
             Minimize -H[p(y | D)] + E[H[p(y | G(z), D)]]
             """
+            # Freeze netD and unfreeze netG
+            for p in self.netD.parameters():
+                p.requires_grad = False
+            for p in self.netG.parameters():
+                p.requires_grad = True
             self.netG.zero_grad()
+            # Generate fake image batch with generator
+            noise = torch.randn(
+                batch_size, self.length_z, 1, 1, device=self.device)
+            generated_from_random_noise = self.netG(noise)
             # Since we just updated discriminator, perform another forward pass
             # of all-fake batch through discriminator
             output_D = self.netD(generated_from_random_noise).view(
                 batch_size, -1)
-            # Calculate generator's loss based on this output
-            loss_G = -mar_G(output_D) + con_G(output_D)
-            # Calculate gradients for generator
-            loss_G.backward()
+            # Marginal loss
+            loss_G_f1 = mar_G(output_D)
+            loss_G_f1.backward(gradient=neg, retain_graph=True)
+            # Conditional loss
+            loss_G_f2 = con_G(output_D)
+            loss_G_f2.backward(gradient=pos)
+            # Total loss
+            loss_G = loss_G_f1 + loss_G_f2
             # Update generator
             self.netG.optimizer.step()
 
