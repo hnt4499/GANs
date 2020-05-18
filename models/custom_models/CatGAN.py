@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from base import BaseGANDiscriminator
 from .DCGAN import DCGANDiscriminator, DCGANGenerator
+from utils.ops import View
 
 
 class CatGANDiscriminator(BaseGANDiscriminator):
@@ -86,7 +87,8 @@ class CatGANDiscriminator(BaseGANDiscriminator):
             nn.Conv2d(
                 in_channels=out_channels, out_channels=num_classes,
                 kernel_size=4, stride=1, padding=0, bias=False),
-            nn.Softmax(dim=1)
+            View(-1, num_classes),
+            nn.Softmax(dim=-1)
         )
         self[module_name] = module
 
