@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from itertools import repeat
 from collections import OrderedDict
+from collections.abc import Iterable
 
 import pandas as pd
 import torch
@@ -85,13 +86,21 @@ class DefaultDict(dict):
 
 class Cache:
     """Helper class for data caching."""
-    def __init__(self):
-        return
+    def __init__(self, **kwargs):
+        self.cache(**kwargs)
 
     def cache(self, **kwargs):
         for key, value in kwargs.items():
             self.__setattr__(key, value)
-        return
+
+    def __getitem__(self, key):
+        """Supports multi-indexing"""
+        if isinstance(key, Iterable):
+            return tuple(self.__getattribute__(k) for k in key)
+        return self.__getattribute__(key)
+
+    def __setitem__(self, key, value):
+        self.__setattr__(key, value)
 
 
 class CustomMetrics:
