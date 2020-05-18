@@ -94,7 +94,8 @@
                     "dataset": {
                         "type": "dataset",
                         "name": "CIFAR10DatasetWithLabelsNpy",
-                        "args": {"info_path": "/media/jupyter/Data/dataset/cifar10/npy/32x32/info.json", "transform": null, "drop_labels": 0.5, "stratified": true}
+                        "args": {"info_path": "/media/jupyter/Data/dataset/cifar10/npy/32x32/info.json", # "need to modify this when `image_size` is changed" :))
+                                 "transform": null, "drop_labels": 0.5, "stratified": true}
                     },
                     "batch_size": 128,
                     "num_workers": 0,

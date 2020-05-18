@@ -1,3 +1,4 @@
+import re
 import math
 import json
 from pathlib import Path
@@ -15,10 +16,22 @@ def ensure_dir(dirname):
         dirname.mkdir(parents=True, exist_ok=False)
 
 
+def cmt_remover(json_raw):
+    """Remove comments (starting with # as in Python) from JSON raw string.
+    This will detect and remove any characters after "#" (inclusively). Use
+    with care."""
+    matches = re.finditer(r"(?:^.*?(\s*#.*)$)", json_raw, re.MULTILINE)
+    idxs = [(m.start(1), m.end(1)) for m in matches]
+    for start, end in idxs[::-1]:
+        json_raw = json_raw[:start] + json_raw[end:]
+    return json_raw
+
+
 def read_json(fname):
-    fname = Path(fname)
-    with fname.open("rt") as handle:
-        return json.load(handle, object_hook=OrderedDict)
+    with open(fname, "r") as fin:
+        json_raw = fin.read()
+    json_processed = cmt_remover(json_raw)
+    return json.loads(json_processed)
 
 
 def write_json(content, fname):
