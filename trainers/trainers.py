@@ -355,6 +355,15 @@ class CatGANTrainer(BaseGANTrainer):
         self.tracker = MetricTracker(
             "loss_D", "loss_G", *self.custom_metrics.metric_names,
             writer=self.writer)
+        # Warn when number of classes in the dataset and in the discriminator
+        # does not match
+        ncl_dataset = len(self.data_loader.dataset.cls)
+        ncl_dis = self.netD.num_classes
+        if ncl_dataset != ncl_dis:
+            self.logger.warning(
+                "WARNING: Number of classes in the dataset ({}) and in the "
+                "discriminator ({}) does not match".format(
+                    ncl_dataset, ncl_dis))
 
     def _train_epoch(self):
         """Training logic for an epoch.
