@@ -15,22 +15,40 @@ General losses.
 
 
 def nll_loss():
-    def nll(output, target):
+    def nll(output, target, *args, **kwargs):
         return F.nll_loss(output, target)
     return nll
 
 
 def bce_loss():
-    def bce(output, target):
+    def bce(output, target, *args, **kwargs):
         """Classic binary cross entropy loss."""
         return F.binary_cross_entropy(output, target)
     return bce
 
 
 def ce_loss():
-    def ce(output, target):
-        """Classic cross entropy loss"""
-        return F.cross_entropy(output, target)
+    def ce(output, target, *args, smooth_label=1, **kwargs):
+        """Cross entropy loss with label smoothing.
+
+        Parameters
+        ----------
+        smooth_label : float
+            Smooth label for the discriminator.
+
+        """
+        if smooth_label == 1:
+            return F.cross_entropy(output, target)
+        else:
+            # Generate one-hot encoding
+            target_onehot = torch.zeros(
+                *output.shape, dtype=output.dtype, device=target.device)
+            target_onehot.scatter_(1, target.view(-1, 1), 1)
+            # Smooth labels
+            target_onehot = target_onehot * smooth_label
+            # Calculate loss
+            log_softmax = F.log_softmax(output, dim=1)
+            return -(log_softmax * target_onehot).sum(axis=1).mean(axis=0)
     return ce
 
 
@@ -40,7 +58,7 @@ CatGAN-specific losses.
 
 
 def conditional_shannon():
-    def con_H(probs):
+    def con_H(probs, *args, **kwargs):
         """Expected value of Shannon entropy of conditional probabilities.
         Reference:
             Jost Tobias Springenberg. (2016). Unsupervised and Semi-supervised
@@ -53,7 +71,7 @@ def conditional_shannon():
 
 
 def marginal_shannon():
-    def mar_H(probs):
+    def mar_H(probs, *args, **kwargs):
         """Estimate of Shannon entropy of marginal probabilities.
         Reference:
             Jost Tobias Springenberg. (2016). Unsupervised and Semi-supervised

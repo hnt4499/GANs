@@ -421,7 +421,8 @@ class CatGANTrainer(BaseGANTrainer):
             loss_D_r2 = con_D(output_D_wol)
             loss_D_r2.backward(gradient=pos, retain_graph=True)
             # Cross-entropy loss
-            loss_D_r3 = lambd * ce_D(output_D_wl, labels_D)
+            loss_D_r3 = lambd * ce_D(output_D_wl, labels_D,
+                                     smooth_label=self.smooth_label)
             loss_D_r3.backward(gradient=neg)
             # Total loss
             loss_D_real = loss_D_r1 + loss_D_r2 + loss_D_r3
