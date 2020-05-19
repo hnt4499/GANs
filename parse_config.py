@@ -1,5 +1,6 @@
 import os
 import logging
+import inspect
 from pathlib import Path
 from functools import reduce, partial
 from operator import getitem
@@ -34,6 +35,7 @@ class ConfigParser:
         self._config = _update_config(config, modification)
         self.resume = resume
         # Initialize all objects within the configuration in-place
+        self.global_vars = dict()
         self.init_all()
 
         # Set save_dir where trained model and log will be saved
@@ -179,7 +181,7 @@ class ConfigParser:
         # Save mapping for future use
         self.type_mapping = type_mapping
         # Initialize all objects in-place
-        init_all_helper(self.config, self.type_mapping)
+        init_all_helper(self.config, self.type_mapping, self.global_vars)
 
     def prune(self):
         """Recursively remove all instantiated objects from a configuration
@@ -283,7 +285,7 @@ def _get_kwargs(kwargs):
     return clean_kwargs
 
 
-def _get_initialized_object(config, path, type_mapping):
+def _get_initialized_object(config, path, type_mapping, global_vars):
     """Helper function to initialize object given "type", "name" and "args"."""
     # Check validity
     if config["type"] not in type_mapping:
@@ -293,10 +295,15 @@ def _get_initialized_object(config, path, type_mapping):
     # Initialize
     kwargs = _get_kwargs(config["args"])
     fn = getattr(type_mapping[config["type"]], config["name"])
+    # Append global variables
+    all_kwargs = inspect.getfullargspec(fn)[0]
+    for kwarg in all_kwargs:
+        if kwarg not in kwargs and kwarg in global_vars:
+            kwargs[kwarg] = global_vars[kwarg]
     return fn(**kwargs)
 
 
-def init_all_helper(config, type_mapping, level=0, path="root",
+def init_all_helper(config, type_mapping, global_vars, level=0, path="root",
                     is_arg=False):
     """Recursion helper function for `ConfigParser.init_all`.
 
@@ -315,6 +322,10 @@ def init_all_helper(config, type_mapping, level=0, path="root",
     """
     if not isinstance(config, dict):
         return
+    # Parse global variables
+    if level == 0 and "global" in config:
+        for key, value in config["global"].items():
+            global_vars[key] = value
     keys = config.keys()
     # If any of ["type", "name", "args"] is in config.keys() and the others
     # are not, raise an Error
@@ -327,13 +338,15 @@ def init_all_helper(config, type_mapping, level=0, path="root",
         # Initialize children objects
         for key in keys:
             init_all_helper(
-                config[key], type_mapping, level + 1, path, is_arg=True)
+                config[key], type_mapping, global_vars, level + 1, path,
+                is_arg=True)
 
         # Ignore current object if `ignored` is set to True
         if "ignored" in config and config["ignored"]:
             return
         # Otherwise, initialize current object
-        config["obj"] = _get_initialized_object(config, path, type_mapping)
+        config["obj"] = _get_initialized_object(
+            config, path, type_mapping, global_vars)
     # Allow function arguments to have one of ["type", "name", "args"]
     else:
         # Handle object as a list of multiple objects.
@@ -347,7 +360,8 @@ def init_all_helper(config, type_mapping, level=0, path="root",
         for key in keys:
             child_path = path + "->" + key
             init_all_helper(
-                config[key], type_mapping, level + 1, child_path, is_arg=False)
+                config[key], type_mapping, global_vars, level + 1, child_path,
+                is_arg=False)
         # Post-handle multiple objects for compatibility
         if "0" in keys:
             objs = list()
