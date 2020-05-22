@@ -11,11 +11,18 @@ class DCGANDiscriminator(BaseGANDiscriminator):
     Adapted from:
         https://github.com/pytorch/examples/blob/master/dcgan/main.py#L164
     """
-    def __init__(self, image_size, num_features, num_channels, conv_bias,
-                 negative_slope, optimizer, criterion, weights_init=None):
+    def __init__(self, optimizer, criterion, image_size=64, num_features=64,
+                 num_channels=3, conv_bias=False, negative_slope=0.2,
+                 weights_init=None):
         """
         Parameters
         ----------
+        optimizer : fn
+            A function initialized in `compile.optimizers` that takes only the
+            model trainable parameters as input.
+        criterion : fn
+            A function initialized in `compile.criterion` that takes the model
+            predictions and target labels, and return the computed loss.
         image_size : int
             Discriminator's output image size. Must be of the form `2 ** n`,
             n >= 5 (e.g., 32 or 64).
@@ -29,12 +36,6 @@ class DCGANDiscriminator(BaseGANDiscriminator):
             Whether to include bias in the convolutional layers.
         negative_slope : float
             Hypterparameter for the Leaky RELU layers.
-        optimizer : fn
-            A function initialized in `compile.optimizers` that takes only the
-            model trainable parameters as input.
-        criterion : fn
-            A function initialized in `compile.criterion` that takes the model
-            predictions and target labels, and return the computed loss.
         weights_init : fn
             A function initialized in `models.weights_init` that will then be
             passed to `model.apply()`. (default: None)
@@ -109,11 +110,18 @@ class DCGANGenerator(BaseGANGenerator):
     Adapted from:
         https://github.com/pytorch/examples/blob/master/dcgan/main.py#L122
     """
-    def __init__(self, image_size, input_length, num_features, num_channels,
-                 conv_bias, optimizer, criterion, weights_init=None):
+    def __init__(self, optimizer, criterion, image_size=64, input_length=100,
+                 num_features=64, num_channels=3, conv_bias=False,
+                 weights_init=None):
         """
         Parameters
         ----------
+        optimizer : fn
+            A function initialized in `compile.optimizers` that takes only the
+            model trainable parameters as input.
+        criterion : fn
+            A function initialized in `compile.criterion` that takes the model
+            predictions and target labels, and return the computed loss.
         image_size : int
             Generator's output image size. Must be of the form `2 ** n`, n >= 5
             (e.g., 32 or 64).
@@ -130,12 +138,6 @@ class DCGANGenerator(BaseGANGenerator):
         conv_bias : bool
             Whether to include bias in the fractionally-strided convolutional
             layers.
-        optimizer : fn
-            A function initialized in `compile.optimizers` that takes only the
-            model trainable parameters as input.
-        criterion : fn
-            A function initialized in `compile.criterion` that takes the model
-            predictions and target labels, and return the computed loss.
         weights_init : fn
             A function initialized in `models.weights_init` that will then be
             passed to `model.apply()`. (default: None)
@@ -163,39 +165,45 @@ class DCGANGenerator(BaseGANGenerator):
             raise ValueError("Invalid value for `num_channels`. Expected one "
                              "of [1, 3], got {} instead.".format(num_features))
 
-        seq = list()
+        seq = OrderedDict()
+        li = 0  # transposed convolutional layer index
+        layer_name = "ConvTranspose2d_{}".format(li)
         # First layer
         out_channels = num_features * (2 ** (self.num_layers - 1))
-        seq.extend([
+        seq[layer_name] = nn.Sequential(
             nn.ConvTranspose2d(
                 in_channels=input_length, out_channels=out_channels,
                 kernel_size=4, stride=1, padding=0, bias=conv_bias),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
-        ])
+        )
         # The rest of the intermediate layers
         for i in range(self.num_layers - 1):
+            # Layer name
+            li += 1
+            layer_name = "ConvTranspose2d_{}".format(li)
+
             in_channels = out_channels
             out_channels = num_features * (2 ** (self.num_layers - 2 - i))
-            seq.extend([
+            seq[layer_name] = nn.Sequential(
                 nn.ConvTranspose2d(
                     in_channels=in_channels, out_channels=out_channels,
                     kernel_size=4, stride=2, padding=1, bias=conv_bias),
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU(inplace=True)
-            ])
+            )
+
         # The output layer
-        seq.extend([
+        li += 1
+        layer_name = "ConvTranspose2d_{}".format(li)
+        seq[layer_name] = nn.Sequential(
             nn.ConvTranspose2d(
                 in_channels=out_channels, out_channels=num_channels,
                 kernel_size=4, stride=2, padding=1, bias=False),
             nn.Tanh()
-        ])
+        )
 
-        # Forward sequence
-        self.fw = nn.Sequential(*seq)
+        # Construct using OrderedDict
+        self.construct(seq)
         # Initialize optimizer and model weights
         self.init()
-
-    def forward(self, x):
-        return self.fw(x)

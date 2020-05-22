@@ -15,12 +15,21 @@ class CatGANDiscriminator(BaseGANDiscriminator):
         Learning with Categorical Generative Adversarial Networks
 
     """
-    def __init__(self, image_size, num_features, num_channels, num_classes,
-                 conv_bias, negative_slope, optimizer, criterion,
-                 weights_init=None):
+    def __init__(self, optimizer, criterion, num_classes, image_size=32,
+                 num_features=64, num_channels=3, conv_bias=False,
+                 negative_slope=0.2, weights_init=None):
         """
         Parameters
         ----------
+        optimizer : fn
+            A function initialized in `compile.optimizers` that takes only the
+            model trainable parameters as input.
+        criterion : fn
+            A function initialized in `compile.criterion` that takes the model
+            predictions and target labels, and return the computed loss.
+        num_classes : int
+            Number of classes for predictions. This should (but not
+            necessarily) be equal to the number of classes in the dataset.
         image_size : int
             Discriminator's output image size. Must be of the form `2 ** n`,
             n >= 5 (e.g., 32 or 64).
@@ -30,19 +39,10 @@ class CatGANDiscriminator(BaseGANDiscriminator):
             (e.g, 32 -> 64 -> 128 -> 256).
         num_channels : int
             One of [1, 3]. Number of input image channels.
-        num_classes : int
-            Number of classes for predictions. This should (but not
-            necessarily) be equal to the number of classes in the dataset.
         conv_bias : bool
             Whether to include bias in the convolutional layers.
         negative_slope : float
             Hypterparameter for the Leaky RELU layers.
-        optimizer : fn
-            A function initialized in `compile.optimizers` that takes only the
-            model trainable parameters as input.
-        criterion : fn
-            A function initialized in `compile.criterion` that takes the model
-            predictions and target labels, and return the computed loss.
         weights_init : fn
             A function initialized in `models.weights_init` that will then be
             passed to `model.apply()`. (default: None)
@@ -93,3 +93,11 @@ class CatGANGenerator(DCGANGenerator):
         Jost Tobias Springenberg. (2016). Unsupervised and Semi-supervised
         Learning with Categorical Generative Adversarial Networks
     """
+    def __init__(self, optimizer, criterion, image_size=32, input_length=100,
+                 num_features=64, num_channels=3, conv_bias=False,
+                 weights_init=None):
+        super(CatGANGenerator, self).__init__(
+            optimizer=optimizer, criterion=criterion, image_size=image_size,
+            input_length=input_length, num_features=num_features,
+            num_channels=num_channels, conv_bias=conv_bias,
+            weights_init=weights_init)
