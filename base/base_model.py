@@ -30,6 +30,13 @@ class BaseModel(nn.Module):
         if isinstance(value, nn.Module):
             self.modules.append(name)
 
+    def __delattr__(self, name):
+        """If the attribute to delete is a layer, delete it from cache as well
+        """
+        if name in self.modules:
+            self.modules.remove(name)
+        super(BaseModel, self).__delattr__(name)
+
     def __getitem__(self, key):
         """Get item as if this is a traditional dictionary, except that key
         could be an integer or a string.
@@ -48,24 +55,59 @@ class BaseModel(nn.Module):
     def __setitem__(self, key, value):
         self.__setattr__(key, value)
 
-    def forward(self, inputs):
-        """Forward pass logic. By default, this will pass sequentially in the
-        order in which the modules have been set.
+    def _get_layer_name(self, layer):
+        """Helper function to get layer name"""
+        if isinstance(layer, int):
+            layer = self.modules[layer]
+        return layer
+
+    def forward(self, inp, output_layer=-1):
+        """Forward pass logic. This will pass sequentially in the order in
+        which the modules have been set. Pass `output_layer` with layer name or
+        layer index to get the output at a specific layer.
+
+        Parameters
+        ----------
+        inp : torch.Tensor
+            Input tensor.
+        output_layer : int, str, list
+            If `int`, passed as layer index.
+            If `str`, passed as layer name.
+            If `list` of `int` or `str`, passed respectively and return a tuple
+            of respective output layers.
+            (default: -1 (i.e., the last layer))
 
         Returns
         -------
             Model output.
 
         """
-        return self.forward_all(inputs)
-
-    def forward_all(self, inp):
-        """Forward sequentially in the order in which the modules have been set
-        """
+        is_list = True
+        if isinstance(output_layer, (int, str)):
+            is_list = False
+            output_layer = [output_layer]
+        # Get all output layer names
+        output_layer = [self._get_layer_name(layer) for layer in output_layer]
+        # Check validity
+        for layer in output_layer:
+            if layer not in self.modules:
+                raise ValueError("Invalid layer name. Expected one of {}, got "
+                                 "'{}' instead.".format(self.modules, layer))
+        # Forward
+        results = [0] * len(output_layer)
         out = inp
         for module in self.modules:
             out = self.__getattr__(module)(out)
-        return out
+            if module in output_layer:
+                # We want `results` to be in the same order as `output_layer`
+                for i, layer in enumerate(output_layer):
+                    if layer == module:
+                        results[i] = out
+        # Post-process results
+        if is_list:
+            return tuple(results)
+        else:
+            return results[0]
 
     def construct(self, sequence):
         """Automatically construct model based on the OrderedDict passed.
