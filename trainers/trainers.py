@@ -351,7 +351,7 @@ class CatGANTrainer(BaseGANTrainer):
                  callbacks=None):
         super(CatGANTrainer, self).__init__(
             netD=netD, netG=netG, metrics=metrics, data_loader=data_loader,
-            train_options=train_options, config=config, callbacks=None)
+            train_options=train_options, config=config, callbacks=callbacks)
         self.tracker = MetricTracker(
             "loss_D", "loss_G", *self.custom_metrics.metric_names,
             writer=self.writer)
@@ -367,11 +367,6 @@ class CatGANTrainer(BaseGANTrainer):
 
     def _train_epoch(self):
         """Training logic for an epoch.
-
-        Parameters
-        ----------
-        epoch : int
-            Current training epoch.
 
         Returns
         -------
@@ -529,3 +524,179 @@ class CatGANTrainer(BaseGANTrainer):
         for met in self.custom_metrics.metrics:
             to_print += "\t{}".format(str(met))
         self.logger.info(to_print)
+
+
+class ImprovedGANTrainer(CatGANTrainer):
+    """Training logic for ImprovedGAN. Note that the author of ImprovedGAN
+    actually implemented some tricks to make the model perform better which
+    were not described in details in the paper.
+
+    Adapted from:
+        https://github.com/openai/improved-gan
+        https://github.com/Sleepychord/ImprovedGAN-pytorch
+    Reference:
+        Salimans, T., Goodfellow, I., Zaremba, W., Cheung, V., Radford, A., &
+        Chen, X. (2016). Improved Techniques for Training GANs.
+
+    Parameters
+    ----------
+    netD
+        Instantiated discriminator architecture. A subclass of
+        `base.BaseModel`, found in module `models.models`. For example
+        `models.models.ImprovedGANDiscriminator`.
+    netG
+        Instantiated generator architecture. A subclass of `base.BaseModel`,
+        found in module `models.models`. For example
+        `models.models.ImprovedGANGenerator`.
+    metrics
+        Instantiated metrics object, defined in `compile.metrics`, which gets
+        called every epoch and return the computed metric(s).
+    data_loader
+        Instantiated data loader. A subclass of `base.BaseDataLoader`, defined
+        in module `data_loaders.data_loaders`. The dataset must return labels
+        for every observation (return `-1`s for non-labeled data). For example
+        `data_loaders.data_loaders.CIFAR10Loader`.
+    train_options : dict
+        Training options, e.g., the number of epochs.
+    config
+        The configurations parsed from a JSON file.
+    callbacks : trainers.callbacks
+        An early stopping callbacks, which gets called every epoch and return a
+        boolean value indicating whether to stop the training process.
+
+    Attributes
+    ----------
+    fixed_noise
+        The fixed noise input tensor, which is fixed and fed into the generator
+        to visually see the training progress.
+    tracker : utils.MetricTracker
+        Used to track the metrics such as loss.
+    writer : logger.TensorboardWriter
+        A Tensorboard writer.
+    config
+    data_loader
+    model
+
+    """
+
+    def _train_epoch(self):
+        """Training logic for an epoch.
+
+        Returns
+        -------
+            A log that contains average loss and metrics in this epoch.
+
+        """
+        self.netD.train()
+        self.netG.train()
+        self.tracker.reset()
+        unsupervised_weight = self.netD.criterion.unsupervised_weight
+
+        for batch_idx, (real_data, real_labels) in enumerate(self.data_loader):
+            # Batch start
+            self.on_batch_start()
+            """
+            DISCRIMINATOR
+            Update discriminator network with all-real batch. Maximize
+            H[p(y | D)] - E[H[p(y | x, D)]] + λ * E[CE(y_label, p(y | x, D))]
+            """
+            # Freeze netG and unfreeze netD
+            for p in self.netD.parameters():
+                p.requires_grad = True
+            for p in self.netG.parameters():
+                p.requires_grad = False
+            self.netD.zero_grad()
+            # Format batch
+            real_data = real_data.to(self.device)
+            real_labels = real_labels.to(self.device)
+            batch_size = real_data.size(0)
+            # Forward pass real batch through discriminator
+            output_D = self.netD(real_data).view(batch_size, -1)
+            # Separate data with and without labels
+            with_labels = (real_labels != -1)
+            labels_D = real_labels[with_labels]
+            output_D_wl = output_D[with_labels]
+            output_D_wol = output_D[~with_labels]
+            # Loss for real data with labels
+            loss_D_r1 = self.netD.criterion.loss_real_with_labels(
+                output_D_wl, labels_D)
+            # Loss for real data without labels
+            loss_D_r2 = self.netD.criterion.loss_real_without_labels(
+                output_D_wol)
+            # Total loss for real data
+            loss_D_real = loss_D_r1 + unsupervised_weight * loss_D_r2
+
+            """
+            DISCRIMINATOR
+            Update discriminator network with all-fake batch. Maximize
+            E[H[p(y | G(z), D)]]
+            """
+            # Input noise
+            noise = torch.randn(
+                batch_size, self.length_z, 1, 1, device=self.device)
+            # Generate fake image batch with generator
+            generated_from_random_noise = self.netG(noise)
+            # Classify all-fake batch with discriminator
+            output_D = self.netD(generated_from_random_noise.detach())
+            # Calculate discriminator's loss on the all-fake batch
+            loss_D_fake = self.netD.criterion.loss_fake(output_D)
+            # Add the gradients from the all-real and all-fake batches
+            loss_D = loss_D_real + unsupervised_weight * loss_D_fake
+            loss_D.backward()
+            # Update discriminator
+            self.netD.optimizer.step()
+
+            """
+            GENERATOR
+            Update generator network.
+            Minimize -H[p(y | D)] + E[H[p(y | G(z), D)]]
+            """
+            # Freeze netD and unfreeze netG
+            for p in self.netD.parameters():
+                p.requires_grad = False
+            for p in self.netG.parameters():
+                p.requires_grad = True
+            self.netG.zero_grad()
+            # Real data's features from the second last layer
+            features_real = self.netD(
+                real_data.detach(), output_layer=-2).detach()
+            # Generate fake image batch with generator
+            noise = torch.randn(
+                batch_size, self.length_z, 1, 1, device=self.device)
+            generated_from_random_noise = self.netG(noise)
+            # Fake data's features from the second last layer
+            features_fake = self.netD(
+                generated_from_random_noise, output_layer=-2)
+            # Feature matching loss
+            loss_G = self.netG.criterion(features_real, features_fake)
+            loss_G.backward()
+            # Update generator
+            self.netG.optimizer.step()
+
+            # Cache data for future use; and send all data to cpu
+            with torch.no_grad():
+                generated_from_fixed_noise = self.netG(
+                    self.fixed_noise).detach()
+            self.current_batch.cache(
+                batch_idx=batch_idx,
+                batch_size=batch_size,
+                global_step=self.epoch * self.len_epoch + batch_idx,
+
+                real_samples=real_data.cpu(),
+                fixed_noise=self.fixed_noise.cpu(),
+                generated_from_fixed_noise=generated_from_fixed_noise.cpu(),
+                random_noise=noise.cpu(),
+                generated_from_random_noise=generated_from_random_noise.cpu(),
+                output_D=output_D.cpu(),  # disc. output for generated images
+
+                loss_D=loss_D.item(),
+                loss_G=loss_G.item(),
+            )
+
+            # Batch end
+            self.on_batch_end()
+            # Early stopping
+            if self.stop:
+                break
+
+        return self.tracker.result()
