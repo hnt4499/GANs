@@ -66,8 +66,7 @@ class CatGANDiscriminator(BaseGANDiscriminator):
             negative_slope=negative_slope, optimizer=optimizer,
             criterion=criterion, weights_init=weights_init)
         self.num_layers = dcgan.num_layers
-        for module_name in dcgan.modules[:-1]:
-            self[module_name] = dcgan[module_name]
+        self.copy_layers(dcgan, dcgan.modules[:-1])
 
         # Get information
         module_name = dcgan.modules[-1]

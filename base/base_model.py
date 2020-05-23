@@ -121,6 +121,36 @@ class BaseModel(nn.Module):
         for module_name, module in sequence.items():
             self.__setattr__(module_name, module)
 
+    def copy_layers(self, model, layers):
+        """Copy layers from other model.
+
+        Parameters
+        ----------
+        model : BaseModel or its subclass
+            Model to copy layers from. Must be of type `BaseModel` or its
+            subclass.
+        layers : list
+            List of `int` or `str`.
+            If `int`, passed as layer index.
+            If `str`, passed as layer name.
+
+        """
+        if not isinstance(model, BaseModel):
+            raise ValueError("Invalid model type. Expected `BaseModel` or its "
+                             "subclass, got `{}` instead.".format(type(model)))
+        layers_ = list()
+        for layer in layers:
+            if isinstance(layer, int):
+                layers_.append(model.modules[layer])
+            elif isinstance(layer, str):
+                layers_.append(layer)
+            else:
+                raise ValueError(
+                    "Invalid layer type. Expected one of [str, int], got {} "
+                    "instead.".format(type(layer)))
+        for layer in layers_:
+            self.__setattr__(layer, model[layer])
+
 
 class BaseGANComponent(BaseModel):
     """Base class for all discriminators and generators."""
