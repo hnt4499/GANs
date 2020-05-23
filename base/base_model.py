@@ -7,7 +7,8 @@ from abc import abstractmethod
 
 class BaseModel(nn.Module):
     """
-    Base class for all models
+    Base class for all models. Be careful with any attempt to set attribute
+    with `nn.Module`, as this might result in unprecedent error.
     """
     def __init__(self):
         super(BaseModel, self).__init__()
@@ -184,6 +185,16 @@ class BaseGANComponent(BaseModel):
         self.optimizer = optimizer
         self.criterion = criterion
         self.weights_init = weights_init
+
+    def __setattr__(self, name, value):
+        """Set an attribute as in its parent class `nn.Module` and build the
+        hierarchy at the same time, but avoid caching incorrectly"""
+        # Set module as in parent class `nn.Module`
+        super(BaseModel, self).__setattr__(name, value)
+        # Build the hierarchy carefully
+        if name not in ["optimizer", "criterion", "weights_init"] \
+                and isinstance(value, nn.Module):
+            self.modules.append(name)
 
     def init(self):
         """Initialize optimizer and model weights. Called only when model
