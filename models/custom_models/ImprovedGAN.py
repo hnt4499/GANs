@@ -137,3 +137,90 @@ class ImprovedGANGeneratorV1(ImprovedGANGeneratorV0):
     """
 
 
+class ImprovedGANDiscriminatorV2(ImprovedGANDiscriminatorV0):
+    """ImprovedGAN Discriminator with feature matching loss and minibatch
+    discrimination.
+    Reference:
+        Salimans, T., Goodfellow, I., Zaremba, W., Cheung, V., Radford, A., &
+        Chen, X. (2016). Improved Techniques for Training GANs.
+
+    """
+    def __init__(self, optimizer, criterion, num_classes, minibatch_disc,
+                 image_size=32, num_features=128, num_channels=3,
+                 conv_bias=False, negative_slope=0.2, weights_init=None):
+        """
+        Parameters
+        ----------
+        optimizer : fn
+            A function initialized in `compile.optimizers` that takes only the
+            model trainable parameters as input.
+        criterion : fn
+            A function initialized in `compile.criterion` that takes the model
+            predictions and target labels, and return the computed loss.
+        num_classes : int
+            Number of classes for predictions. This should (but not
+            necessarily) be equal to the number of classes in the dataset.
+        minibatch_disc
+            A partially initialized custom minibatch discrimination layer
+            defined in `utils.ops`, which takes only `in_channels` as argument
+            to be fully initialized.
+        image_size : int
+            Discriminator's output image size. Must be of the form `2 ** n`,
+            n >= 5 (e.g., 32 or 64).
+        num_features : int
+            Number of channels of the first layer. The number of channels of
+            a layer is as twice as that of its precedent layer
+            (e.g, 64 -> 128 -> 256 -> 512 -> 1024).
+        num_channels : int
+            One of [1, 3]. Number of input image channels.
+        conv_bias : bool
+            Whether to include bias in the convolutional layers.
+        negative_slope : float
+            Hypterparameter for the Leaky RELU layers.
+        weights_init : fn
+            A function initialized in `models.weights_init` that will then be
+            passed to `model.apply()`. (default: None)
+
+        """
+        self.minibatch_disc = minibatch_disc
+        super(ImprovedGANDiscriminatorV2, self).__init__(
+            optimizer=optimizer, criterion=criterion, num_classes=num_classes,
+            image_size=image_size, num_features=num_features,
+            num_channels=num_channels, conv_bias=conv_bias,
+            negative_slope=negative_slope, weights_init=weights_init
+        )
+        self.remove_from_module_list("minibatch_disc")  # does not cache this
+
+    def build_model(self):
+        # Get layers from DCGAN, except the last layer
+        self.copy_layers(self.dcgan, self.dcgan.module_names[:-1])
+        # The last convolutional layer will still double the number of
+        # channels, as opposed to other models; but no Leaky ReLU and batchnorm
+        # here.
+        module_name = self.dcgan.module_names[-1]
+        out_channels = self.dcgan[-2].__getattr__("0").out_channels
+        module = nn.Sequential(
+            nn.Conv2d(
+                in_channels=out_channels, out_channels=out_channels * 2,
+                kernel_size=4, stride=1, padding=0, bias=False),
+            View("0", -1)
+        )
+        self[module_name] = module
+        # The last layer is a minibatch discrimination layer, followed by a
+        # linear layer
+        minibatch_disc_layer = self.minibatch_disc(
+            in_features=out_channels * 2)
+        self["Linear"] = nn.Sequential(
+            minibatch_disc_layer,
+            nn.Linear(minibatch_disc_layer.out_features, self.num_classes)
+        )
+
+
+class ImprovedGANGeneratorV2(ImprovedGANGeneratorV0):
+    """ImprovedGAN generator with feature matching loss and minibatch
+    discrimination.
+    Reference:
+        Salimans, T., Goodfellow, I., Zaremba, W., Cheung, V., Radford, A., &
+        Chen, X. (2016). Improved Techniques for Training GANs.
+
+    """

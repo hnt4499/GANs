@@ -1,0 +1,120 @@
+{
+    "name": "ImprovedGAN",
+    "n_gpu": 1,
+    "seed": 136,
+    "global": {
+        "device": "cuda",
+        "batch_size": 128,
+        "image_size": 32,
+        "num_channels": 3,
+        "num_features": 32
+    },
+
+    "trainer": {
+        "ignored": true,
+        "type": "trainer",
+        "name": "ImprovedGANTrainer",
+        "args": {
+            "netD": {
+                "type": "model",
+                "name": "ImprovedGANDiscriminatorV2",
+                "args": {
+                    "num_classes": 10,
+                    "conv_bias": false,
+                    "negative_slope": 0.2,
+                    "minibatch_disc": {
+                        "type": "ops",
+                        "name": "MinibatchDiscriminationV1",
+                        "partial": true,
+                        "args": {"out_features": 500, "kernel_dims": 5, "mean": true}
+                    },
+                    "optimizer": {
+                        "type": "optimizer",
+                        "name": "Adam",
+                        "args": {"lr": 0.0003, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": false}
+                    },
+                    "criterion": {
+                        "type": "criterion",
+                        "name": "ImprovedGANDiscriminatorLoss",
+                        "args": {"unsupervised_weight": 0.5}
+                    },
+                    "weights_init": {
+                        "type": "weights_init",
+                        "name": "DCGAN_wi",
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    }
+                }
+            },
+            "netG": {
+                "type": "model",
+                "name": "ImprovedGANGeneratorV2",
+                "args": {
+                    "input_length": 100,
+                    "conv_bias": false,
+                    "optimizer": {
+                        "type": "optimizer",
+                        "name": "Adam",
+                        "args": {"lr": 0.0003, "betas": [0.5, 0.999], "weight_decay": 0, "amsgrad": true}
+                    },
+                    "criterion": {
+                        "type": "criterion",
+                        "name": "ImprovedGANGeneratorLoss",
+                        "args": {}
+                    },
+                    "weights_init": {
+                        "type": "weights_init",
+                        "name": "DCGAN_wi",
+                        "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    }
+                }
+            },
+            "metrics": {
+                "0": {
+                    "type": "metric",
+                    "name": "FIDScore",
+                    "args": {
+                        "model": {
+                            "type": "features_extractor",
+                            "name": "InceptionV3FE",
+                            "args": {"output_layer": "Mixed_5d", "resize_to": null, "normalize_input": true,
+                                     "transform_input": true, "prune": true, "traverse_level": 1}
+                        },
+                        "name": "fid", "max_samples": 10000, "dp": 4
+                    }
+                },
+                "comment": "This protocol is used to handle arguments as a list of objects.",
+                "comment_2": " Each metric should associate with a 0-based-index key, in the form of str, for example, \"0\", \"1\"."
+            },
+
+            "data_loader": {
+                "type": "data_loader",
+                "name": "CIFAR10Loader",
+                "args": {
+                    "dataset": {
+                        "type": "dataset",
+                        "name": "CIFAR10DatasetWithLabelsNpy",
+                        "args": {"info_path": "/media/jupyter/Data/dataset/cifar10/npy/32x32/info.json", # "need to modify this when `image_size` is changed" :))
+                                 "transform": null, "drop_labels": 0.5, "stratified": true}
+                    },
+                    "num_workers": 0,
+                    "shuffle": true
+                }
+            },
+
+            "callbacks": null,
+
+            "train_options": {
+                "smooth_label": 0.75,
+                "epochs": 100,
+                "save_dir": "/media/jupyter/Data/train/ImprovedGAN",
+                "save_ckpt_every": 100,
+                "num_ckpt_to_keep": 5,
+                "save_images_every": 100,
+                "write_logs_every": 5,
+                "evaluate_every": 5,
+                "verbosity": 2,
+                "tensorboard": true
+            }
+        }
+    }
+}
