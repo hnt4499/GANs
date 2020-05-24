@@ -155,12 +155,15 @@ class ConfigParser:
 
         """
         # Import modules only when this function is called
+        import utils as module_utils
         import models as module_models
         import compile as module_compile
         import data_loaders as module_data
         import trainers as module_trainers
         # Mapping for object initialization
         type_mapping = {
+            # Custom operators
+            "ops": module_utils.ops,
             # Models
             "model": module_models.models,
             "weights_init": module_models.weights_init,
@@ -286,7 +289,8 @@ def _get_kwargs(kwargs):
 
 
 def _get_initialized_object(config, path, type_mapping, global_vars):
-    """Helper function to initialize object given "type", "name" and "args"."""
+    """Helper function to initialize object given "type", "name" and "args",
+    with an option to partially initialize the object."""
     # Check validity
     if config["type"] not in type_mapping:
         raise ValueError(
@@ -300,7 +304,12 @@ def _get_initialized_object(config, path, type_mapping, global_vars):
     for kwarg in all_kwargs:
         if kwarg not in kwargs and kwarg in global_vars:
             kwargs[kwarg] = global_vars[kwarg]
-    return fn(**kwargs)
+    # Partially initializing
+    if "partial" in config and config["partial"]:
+        return partial(fn, **kwargs)
+    # Fully initializing
+    else:
+        return fn(**kwargs)
 
 
 def init_all_helper(config, type_mapping, global_vars, level=0, path="root",
