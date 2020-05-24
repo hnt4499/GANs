@@ -66,10 +66,10 @@ class CatGANDiscriminator(BaseGANDiscriminator):
             negative_slope=negative_slope, optimizer=optimizer,
             criterion=criterion, weights_init=weights_init)
         self.num_layers = dcgan.num_layers
-        self.copy_layers(dcgan, dcgan.modules[:-1])
+        self.copy_layers(dcgan, dcgan.module_names[:-1])
 
         # Get information
-        module_name = dcgan.modules[-1]
+        module_name = dcgan.module_names[-1]
         out_channels = dcgan[-2].__getattr__("0").out_channels
         # Construct the last layer
         module = nn.Sequential(

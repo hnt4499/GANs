@@ -12,7 +12,7 @@ class BaseModel(nn.Module):
     """
     def __init__(self):
         super(BaseModel, self).__init__()
-        self.modules = list()  # list of module names
+        self.module_names = list()  # list of module names
 
     def __str__(self):
         """
@@ -29,13 +29,12 @@ class BaseModel(nn.Module):
         super(BaseModel, self).__setattr__(name, value)
         # Build the hierarchy
         if isinstance(value, nn.Module):
-            self.modules.append(name)
+            self.module_names.append(name)
 
     def __delattr__(self, name):
         """If the attribute to delete is a layer, delete it from cache as well
         """
-        if name in self.modules:
-            self.modules.remove(name)
+        self.remove_from_module_list(name)
         super(BaseModel, self).__delattr__(name)
 
     def __getitem__(self, key):
@@ -50,7 +49,7 @@ class BaseModel(nn.Module):
 
         """
         if isinstance(key, int):
-            key = self.modules[key]
+            key = self.module_names[key]
         return self.__getattr__(key)
 
     def __setitem__(self, key, value):
@@ -59,8 +58,15 @@ class BaseModel(nn.Module):
     def _get_layer_name(self, layer):
         """Helper function to get layer name"""
         if isinstance(layer, int):
-            layer = self.modules[layer]
+            layer = self.module_names[layer]
         return layer
+
+    def remove_from_module_list(self, name):
+        """Remove a registered module from the module list, so that `forward`
+        can work properly. Note that this does not actually delete the
+        module."""
+        if name in self.module_names:
+            self.module_names.remove(name)
 
     def forward(self, inp, output_layer=-1):
         """Forward pass logic. This will pass sequentially in the order in
@@ -91,13 +97,14 @@ class BaseModel(nn.Module):
         output_layer = [self._get_layer_name(layer) for layer in output_layer]
         # Check validity
         for layer in output_layer:
-            if layer not in self.modules:
+            if layer not in self.module_names:
                 raise ValueError("Invalid layer name. Expected one of {}, got "
-                                 "'{}' instead.".format(self.modules, layer))
+                                 "'{}' instead.".format(self.module_names,
+                                                        layer))
         # Forward
         results = [0] * len(output_layer)
         out = inp
-        for module in self.modules:
+        for module in self.module_names:
             out = self.__getattr__(module)(out)
             if module in output_layer:
                 # We want `results` to be in the same order as `output_layer`
@@ -142,7 +149,7 @@ class BaseModel(nn.Module):
         layers_ = list()
         for layer in layers:
             if isinstance(layer, int):
-                layers_.append(model.modules[layer])
+                layers_.append(model.module_names[layer])
             elif isinstance(layer, str):
                 layers_.append(layer)
             else:
@@ -194,7 +201,7 @@ class BaseGANComponent(BaseModel):
         # Build the hierarchy carefully
         if name not in ["optimizer", "criterion", "weights_init"] \
                 and isinstance(value, nn.Module):
-            self.modules.append(name)
+            self.module_names.append(name)
 
     def init(self):
         """Initialize optimizer and model weights. Called only when model

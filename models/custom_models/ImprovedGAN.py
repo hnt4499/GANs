@@ -111,11 +111,11 @@ class ImprovedGANDiscriminatorV1(ImprovedGANDiscriminatorV0):
     """
     def build_model(self):
         # Get layers from DCGAN, except the last layer
-        self.copy_layers(self.dcgan, self.dcgan.modules[:-1])
+        self.copy_layers(self.dcgan, self.dcgan.module_names[:-1])
         # The last convolutional layer will still double the number of
         # channels, as opposed to other models; but no Leaky ReLU and batchnorm
         # here.
-        module_name = self.dcgan.modules[-1]
+        module_name = self.dcgan.module_names[-1]
         out_channels = self.dcgan[-2].__getattr__("0").out_channels
         module = nn.Sequential(
             nn.Conv2d(
