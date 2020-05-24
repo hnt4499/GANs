@@ -17,7 +17,7 @@
         "args": {
             "netD": {
                 "type": "model",
-                "name": "ImprovedGANDiscriminator",
+                "name": "ImprovedGANDiscriminatorV1",
                 "args": {
                     "num_classes": 10,
                     "conv_bias": false,
@@ -41,7 +41,7 @@
             },
             "netG": {
                 "type": "model",
-                "name": "ImprovedGANGenerator",
+                "name": "ImprovedGANGeneratorV1",
                 "args": {
                     "input_length": 100,
                     "conv_bias": false,
