@@ -2,6 +2,13 @@
     "name": "DCGAN",
     "n_gpu": 1,
     "seed": 136,
+    "global": {
+        "device": "cuda",
+        "batch_size": 128,
+        "image_size": 64,
+        "num_channels": 3,
+        "conv_bias": false
+    },
 
     "trainer": {
         "ignored": true,
@@ -12,10 +19,7 @@
                 "type": "model",
                 "name": "DCGANDiscriminator",
                 "args": {
-                    "image_size": 64,
                     "num_features": 64,
-                    "num_channels": 3,
-                    "conv_bias": false,
                     "negative_slope": 0.2,
                     "optimizer": {
                         "type": "optimizer",
@@ -31,6 +35,12 @@
                         "type": "weights_init",
                         "name": "DCGAN_wi",
                         "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    },
+                    "batchnorm": {
+                        "type": "ops",
+                        "name": "BatchNorm2d",
+                        "partial": true,
+                        "args": {}
                     }
                 }
             },
@@ -38,11 +48,8 @@
                 "type": "model",
                 "name": "DCGANGenerator",
                 "args": {
-                    "image_size": 64,
-                    "input_length": 100,
                     "num_features": 64,
-                    "num_channels": 3,
-                    "conv_bias": false,
+                    "input_length": 100,
                     "optimizer": {
                         "type": "optimizer",
                         "name": "Adam",
@@ -68,8 +75,8 @@
                         "model": {
                             "type": "features_extractor",
                             "name": "InceptionV3FE",
-                            "args": {"output_layer": "Mixed_6e", "resize_to": null, "normalize_input": true, "transform_input": true,
-                                     "batch_size": 128, "device": "cuda", "prune": true, "traverse_level": 1}
+                            "args": {"output_layer": "Mixed_6e", "resize_to": null, "normalize_input": true,
+                                     "transform_input": true, "prune": true, "traverse_level": 1}
                         },
                         "name": "fid", "max_samples": 10000, "dp": 4
                     }
@@ -85,9 +92,8 @@
                     "dataset": {
                         "type": "dataset",
                         "name": "CIFAR10DatasetWithoutLabelsNpy",
-                        "args": {"info_path": "/media/jupyter/Data/dataset/cifar10/info.json", "transform": null}
+                        "args": {"info_path": "/media/jupyter/Data/dataset/cifar10/npy/64x64/info.json", "transform": null}
                     },
-                    "batch_size": 128,
                     "num_workers": 0,
                     "shuffle": true
                 }

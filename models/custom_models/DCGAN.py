@@ -13,7 +13,7 @@ class DCGANDiscriminator(BaseGANDiscriminator):
     """
     def __init__(self, optimizer, criterion, image_size=64, num_features=64,
                  num_channels=3, conv_bias=False, negative_slope=0.2,
-                 weights_init=None):
+                 weights_init=None, batchnorm=nn.BatchNorm2d):
         """
         Parameters
         ----------
@@ -39,6 +39,11 @@ class DCGANDiscriminator(BaseGANDiscriminator):
         weights_init : fn
             A function initialized in `models.weights_init` that will then be
             passed to `model.apply()`. (default: None)
+        batchnorm : callable
+            Batch normalization layer, which takes only number of features as
+            input and return a constructed PyTorch layer. This could
+            potentially be any partially initialized batch normalization layer
+            (e.g., virtual batch normalization, etc.)
 
         """
 
@@ -51,6 +56,7 @@ class DCGANDiscriminator(BaseGANDiscriminator):
         self.num_channels = num_channels
         self.conv_bias = conv_bias
         self.negative_slope = negative_slope
+        self.batchnorm = batchnorm
         # Number of intermediate layers
         num_layers = math.log(image_size, 2) - 2
         if num_layers.is_integer() and num_layers >= 3:
@@ -86,7 +92,7 @@ class DCGANDiscriminator(BaseGANDiscriminator):
                 nn.Conv2d(
                     in_channels=in_channels, out_channels=out_channels,
                     kernel_size=4, stride=2, padding=1, bias=False),
-                nn.BatchNorm2d(out_channels),
+                batchnorm(out_channels),
                 nn.LeakyReLU(negative_slope, inplace=True)
             )
         # The output layer
@@ -112,7 +118,7 @@ class DCGANGenerator(BaseGANGenerator):
     """
     def __init__(self, optimizer, criterion, image_size=64, input_length=100,
                  num_features=64, num_channels=3, conv_bias=False,
-                 weights_init=None):
+                 weights_init=None, batchnorm=nn.BatchNorm2d):
         """
         Parameters
         ----------
@@ -141,6 +147,11 @@ class DCGANGenerator(BaseGANGenerator):
         weights_init : fn
             A function initialized in `models.weights_init` that will then be
             passed to `model.apply()`. (default: None)
+        batchnorm : callable
+            Batch normalization layer, which takes only number of features as
+            input and return a constructed PyTorch layer. This could
+            potentially be any partially initialized batch normalization layer
+            (e.g., virtual batch normalization, etc.)
 
         """
 
@@ -153,6 +164,7 @@ class DCGANGenerator(BaseGANGenerator):
         self.num_features = num_features
         self.num_channels = num_channels
         self.conv_bias = conv_bias
+        self.batchnorm = batchnorm
         # Number of intermediate layers
         num_layers = math.log(image_size, 2) - 2
         if num_layers.is_integer() and num_layers >= 3:
@@ -174,7 +186,7 @@ class DCGANGenerator(BaseGANGenerator):
             nn.ConvTranspose2d(
                 in_channels=input_length, out_channels=out_channels,
                 kernel_size=4, stride=1, padding=0, bias=conv_bias),
-            nn.BatchNorm2d(out_channels),
+            batchnorm(out_channels),
             nn.ReLU(inplace=True)
         )
         # The rest of the intermediate layers
@@ -189,7 +201,7 @@ class DCGANGenerator(BaseGANGenerator):
                 nn.ConvTranspose2d(
                     in_channels=in_channels, out_channels=out_channels,
                     kernel_size=4, stride=2, padding=1, bias=conv_bias),
-                nn.BatchNorm2d(out_channels),
+                batchnorm(out_channels),
                 nn.ReLU(inplace=True)
             )
 

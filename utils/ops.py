@@ -3,6 +3,16 @@
 import torch
 import torch.nn as nn
 
+"""
+PyTorch layers
+"""
+BatchNorm2d = nn.BatchNorm2d
+
+
+"""
+Custom layers.
+"""
+
 
 class View(nn.Module):
     """A module for dynamic tensor reshaping."""
@@ -106,8 +116,8 @@ class MinibatchDiscriminationV1(nn.Module):
 
         M = activations.unsqueeze(0)  # (1, N, B, C)
         M_T = M.permute(1, 0, 2, 3)  # (N, 1, B, C)
-        abs_dif = torch.abs(M - M_T).sum(3)  # (N, N, B), L2 norm
-        exp_abs_dif = torch.exp(-abs_dif)  # (N. N, B), negative exponential
+        abs_dif = (M - M_T).abs().sum(3)  # (N, N, B), L2 norm
+        exp_abs_dif = (-abs_dif).exp()  # (N. N, B), negative exponential
         mb_feats = (exp_abs_dif.sum(0) - 1)  # (N, B), subtract self distance
         if self.mean:
             mb_feats /= inp.size(0) - 1

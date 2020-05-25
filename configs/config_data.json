@@ -11,14 +11,14 @@
                     "transform": {
                         "type": "pre_processing",
                         "name": "DCGAN_transform",
-                        "args": {"image_size": 64, "mean": 0.5, "std": 0.5}
+                        "args": {"image_size": 32, "mean": 0.5, "std": 0.5}
                     },
                     "drop_labels": null,
                     "stratified": true,
                     "subset": "both"
                 }
             },
-            "batch_size": 128,
+            "batch_size": 1024,
             "num_workers": 5,
             "shuffle": false
         }

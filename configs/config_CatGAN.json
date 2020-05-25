@@ -6,7 +6,8 @@
         "device": "cuda",
         "batch_size": 128,
         "image_size": 32,
-        "num_channels": 3
+        "num_channels": 3,
+        "conv_bias": false
     },
 
     "trainer": {
@@ -20,7 +21,6 @@
                 "args": {
                     "num_features": 64,
                     "num_classes": 10,
-                    "conv_bias": false,
                     "negative_slope": 0.2,
                     "optimizer": {
                         "type": "optimizer",
@@ -41,6 +41,12 @@
                         "type": "weights_init",
                         "name": "DCGAN_wi",
                         "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    },
+                    "batchnorm": {
+                        "type": "ops",
+                        "name": "BatchNorm2d",
+                        "partial": true,
+                        "args": {}
                     }
                 }
             },
@@ -50,7 +56,6 @@
                 "args": {
                     "input_length": 100,
                     "num_features": 64,
-                    "conv_bias": false,
                     "optimizer": {
                         "type": "optimizer",
                         "name": "Adam",
@@ -68,6 +73,12 @@
                         "type": "weights_init",
                         "name": "DCGAN_wi",
                         "args": {"conv_mean": 0.0, "conv_std": 0.02, "bn_mean": 1.0, "bn_std": 0.02}
+                    },
+                    "batchnorm": {
+                        "type": "ops",
+                        "name": "BatchNorm2d",
+                        "partial": true,
+                        "args": {}
                     }
                 }
             },
