@@ -178,7 +178,7 @@ class InceptionV3(BaseFeatureExtractorModule):
         x = torch.cat((x_ch0, x_ch1, x_ch2), 1)
         return x
 
-    def forward(self, trainer, inp):
+    def forward(self, trainer, inp, **kwargs):
         """Get Inception feature maps.
 
         Parameters

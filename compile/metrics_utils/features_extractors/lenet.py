@@ -172,7 +172,7 @@ class LeNet5(BaseFeatureExtractorModule):
         if prune:
             self._prune_and_update_mapping()
 
-    def forward(self, trainer, inp):
+    def forward(self, trainer, inp, **kwargs):
         """Get LeNet feature maps.
 
         Parameters

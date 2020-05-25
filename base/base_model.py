@@ -68,7 +68,7 @@ class BaseModel(nn.Module):
         if name in self.module_names:
             self.module_names.remove(name)
 
-    def forward(self, inp, output_layer=-1):
+    def forward(self, inp, output_layer=-1, **kwargs):
         """Forward pass logic. This will pass sequentially in the order in
         which the modules have been set. Pass `output_layer` with layer name or
         layer index to get the output at a specific layer.

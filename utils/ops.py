@@ -34,7 +34,7 @@ class View(nn.Module):
     def __repr__(self):
         return "View{}".format(tuple(self.shape))
 
-    def forward(self, inp):
+    def forward(self, inp, **kwargs):
         shape = list()
         for s in self.shape:
             if isinstance(s, int):
@@ -97,7 +97,7 @@ class MinibatchDiscriminationV1(nn.Module):
                          self.kernel_dims))
         nn.init.normal_(self.theta, mean=0, std=1)
 
-    def forward(self, inp):
+    def forward(self, inp, **kwargs):
         # x.shape = (N, A); self.theta.shape = (A, B, C)
         activations = inp.mm(
             self.theta.view(self.in_features, -1))  # (N, B * C)

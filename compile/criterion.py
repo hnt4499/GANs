@@ -170,7 +170,7 @@ class FeatureMatchingLoss(nn.Module):
     def __init__(self):
         super(FeatureMatchingLoss, self).__init__()
 
-    def forward(self, features_real, features_fake):
+    def forward(self, features_real, features_fake, **kwargs):
         real_shape = features_real.shape
         fake_shape = features_fake.shape
         # Check validity
